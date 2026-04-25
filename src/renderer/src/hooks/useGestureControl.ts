@@ -5,6 +5,7 @@ import { Vector2Smoother } from '../lib/smoothing'
 const ACTIVE_MIN = 0.15
 const ACTIVE_RANGE = 0.70
 const DEAD_ZONE_PX = 4
+const SMOOTHING = 0.3
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v

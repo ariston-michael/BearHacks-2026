@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
-import { mouse, keyboard, Key } from '@nut-tree-fork/nut-js'
+import { mouse, keyboard, Key, Button } from '@nut-tree-fork/nut-js'
 import icon from '../../resources/icon.png?asset'
 import type { VoiceExecuteIntentPayload, VoiceExecuteIntentResult } from '../shared/voiceIpc'
 
