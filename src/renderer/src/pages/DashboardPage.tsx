@@ -9,6 +9,7 @@ export default function DashboardPage(): React.JSX.Element {
       <div className="flex-1 rounded-xl overflow-hidden border border-white/10">
         <CameraView />
       </div>
+      <VoiceControlPanel />
     </div>
   )
 }
