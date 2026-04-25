@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { ElevenLabsScribeTranscriber } from '../lib/elevenLabsTranscriber'
 import type { SpeechTranscriber } from '../lib/speechRecognition'
+import { dispatchVoiceIntent } from '../lib/voiceActionDispatcher'
 import { VultrGemmaIntentProvider, type VoiceIntentProvider } from '../lib/voiceIntent'
 import { useVoiceStore } from '../stores/voiceStore'
 
@@ -20,11 +21,13 @@ export default function VoiceControlPanel(): React.JSX.Element {
   const _transcript = useVoiceStore((_state) => _state.transcript)
   const _lastSegments = useVoiceStore((_state) => _state.lastSegments)
   const _lastIntent = useVoiceStore((_state) => _state.lastIntent)
+  const _lastActionResult = useVoiceStore((_state) => _state.lastActionResult)
   const _errorMessage = useVoiceStore((_state) => _state.errorMessage)
   const _setIsListening = useVoiceStore((_state) => _state.setIsListening)
   const _setIsRecording = useVoiceStore((_state) => _state.setIsRecording)
   const _setAudioLevel = useVoiceStore((_state) => _state.setAudioLevel)
   const _setLastIntent = useVoiceStore((_state) => _state.setLastIntent)
+  const _setLastActionResult = useVoiceStore((_state) => _state.setLastActionResult)
   const _setErrorMessage = useVoiceStore((_state) => _state.setErrorMessage)
   const _appendTranscript = useVoiceStore((_state) => _state.appendTranscript)
   const _clearVoiceState = useVoiceStore((_state) => _state.clearVoiceState)
@@ -74,8 +77,12 @@ export default function VoiceControlPanel(): React.JSX.Element {
               return
             }
             try {
-              const _intent = await m_intentProvider.parseIntent(_result.text)
+              const _intent = await m_intentProvider.parseIntent(_result.text, {
+                segments: _result.segments
+              })
               _setLastIntent(_intent)
+              const _actionResult = await dispatchVoiceIntent(_intent)
+              _setLastActionResult(_actionResult)
             } catch (_intentError) {
               const _message =
                 _intentError instanceof Error ? _intentError.message : 'intent-parse-failed'
@@ -121,8 +128,8 @@ export default function VoiceControlPanel(): React.JSX.Element {
             Voice Control (ElevenLabs Scribe + Vultr Gemma 4)
           </h2>
           <p className="mt-1 text-sm text-white/60">
-            Energy-VAD + ElevenLabs Scribe for transcription, Vultr-hosted Gemma 4 for intent
-            parsing. Speak a phrase, pause, and the parsed intent appears.
+            Energy-VAD + ElevenLabs Scribe for transcription, Vultr Gemma 4 for intent + action
+            (search, open app, scroll). Speak a phrase, pause, and results appear below.
           </p>
         </div>
         {_isRecording && (
@@ -217,6 +224,21 @@ export default function VoiceControlPanel(): React.JSX.Element {
           <div className="font-mono text-xs text-white">
             {_lastIntent ? (
               JSON.stringify(_lastIntent)
+            ) : (
+              <span className="text-white/30">(none yet)</span>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-1 text-white/50">Action result</div>
+          <div
+            className={`font-mono text-xs ${
+              _lastActionResult?.ok ? 'text-emerald-300' : 'text-amber-200/90'
+            }`}
+          >
+            {_lastActionResult ? (
+              _lastActionResult.message
             ) : (
               <span className="text-white/30">(none yet)</span>
             )}
