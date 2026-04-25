@@ -235,12 +235,6 @@ export class VultrGemmaIntentProvider implements VoiceIntentProvider {
     const _content = _data.choices?.[0]?.message?.content?.trim() ?? ''
     const _parsed = safeJsonParse(_content)
     const _normalized = normalizeIntent(_parsed, _content)
-    // #region agent log
-    fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b555ed'},body:JSON.stringify({sessionId:'b555ed',runId:'initial',hypothesisId:'H1,H2',location:'src/renderer/src/lib/voiceIntent.ts:parseIntent',message:'Gemma parse evidence',data:{transcriptLength:_transcript.length,segmentCount:_context?.segments.length??0,contentLength:_content.length,hasThinkTag:_content.includes('<think>'),firstBrace:_content.indexOf('{'),lastBrace:_content.lastIndexOf('}'),parsedAction:_parsed?.action,parsedConfidence:_parsed?.confidence,normalizedAction:_normalized.action,normalizedConfidence:_normalized.confidence,contentPrefix:_content.slice(0,220),contentSuffix:_content.slice(-220)},timestamp:Date.now()})}).catch(()=>{})
-    // #endregion
-    // #region agent log
-    fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'75ef5f'},body:JSON.stringify({sessionId:'75ef5f',runId:'initial',hypothesisId:'H1',location:'src/renderer/src/lib/voiceIntent.ts:parseIntent',message:'Gemma intent normalized',data:{transcriptLength:_transcript.length,contentPrefix:_content.slice(0,180),parsedAction:_parsed?.action,normalizedAction:_normalized.action,hasLinkIndex:_normalized.linkIndex!==undefined,hasLinkText:Boolean(_normalized.linkText?.trim()),hasTargetIndex:_normalized.targetIndex!==undefined,hasTargetText:Boolean(_normalized.targetText?.trim()),targetKind:_normalized.targetKind,confidence:_normalized.confidence},timestamp:Date.now()})}).catch(()=>{})
-    // #endregion
     return _normalized
   }
 }
