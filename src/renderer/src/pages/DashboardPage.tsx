@@ -1,6 +1,12 @@
-// Main dashboard view showing live camera feed, active gesture indicators,
-// cursor preview, and system status. The primary screen users see while AirControl is running.
+import CameraView from '../components/CameraView'
 
 export default function DashboardPage(): React.JSX.Element {
-  return <div>Dashboard</div>
+  return (
+    <div className="flex flex-col gap-4 h-full">
+      <h1 className="text-xl font-semibold text-white">Dashboard</h1>
+      <div className="flex-1 rounded-xl overflow-hidden border border-white/10">
+        <CameraView />
+      </div>
+    </div>
+  )
 }
