@@ -104,6 +104,9 @@ app.whenReady().then(() => {
     'voice:executeIntent',
     async (_event, _raw: unknown): Promise<VoiceExecuteIntentResult> => {
       const _validPayload = isPayload(_raw)
+      // #region agent log
+      fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'75ef5f'},body:JSON.stringify({sessionId:'75ef5f',runId:'initial',hypothesisId:'H2',location:'src/main/index.ts:voice:executeIntent',message:'Main process received voice intent IPC',data:{validPayload:_validPayload,raw:_raw},timestamp:Date.now()})}).catch(()=>{})
+      // #endregion
       if (!_validPayload) {
         return { ok: false, message: 'Invalid voice payload' }
       }

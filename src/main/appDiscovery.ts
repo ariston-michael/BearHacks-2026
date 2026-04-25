@@ -79,6 +79,9 @@ async function discoverWindowsApps(): Promise<DiscoveredApp[]> {
   const _shortcuts = await scanWindowsStartMenuShortcuts()
   const _uwp = await scanWindowsUwpApps()
   const _deduped = dedupeByName([..._shortcuts, ..._uwp])
+  // #region agent log
+  fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'75ef5f'},body:JSON.stringify({sessionId:'75ef5f',runId:'initial',hypothesisId:'H4',location:'src/main/appDiscovery.ts:discoverWindowsApps',message:'Windows app discovery completed',data:{shortcutCount:_shortcuts.length,uwpCount:_uwp.length,dedupedCount:_deduped.length,spotifyMatches:_deduped.filter((_app)=>_app.name.toLowerCase().includes('spotify')).slice(0,5),sample:_deduped.slice(0,10).map((_app)=>({name:_app.name,kind:_app.kind}))},timestamp:Date.now()})}).catch(()=>{})
+  // #endregion
   return _deduped
 }
 

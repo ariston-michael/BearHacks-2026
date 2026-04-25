@@ -214,6 +214,9 @@ async function findBestApp(_name: string): Promise<DiscoveredApp | null> {
   }
   const _fuse = getFuse(_apps)
   const _results = _fuse.search(_name, { limit: 1 })
+  // #region agent log
+  fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'75ef5f'},body:JSON.stringify({sessionId:'75ef5f',runId:'initial',hypothesisId:'H4',location:'src/main/voiceCommands.ts:findBestApp',message:'Fuzzy app lookup completed',data:{requestedName:_name,totalApps:_apps.length,topResult:_results[0]?{name:_results[0].item.name,kind:_results[0].item.kind,score:_results[0].score}:null},timestamp:Date.now()})}).catch(()=>{})
+  // #endregion
   if (_results.length === 0) {
     return null
   }
@@ -225,6 +228,9 @@ async function findBestApp(_name: string): Promise<DiscoveredApp | null> {
 // ---------------------------------------------------------------------------
 
 async function launchDiscoveredApp(_app: DiscoveredApp): Promise<void> {
+  // #region agent log
+  fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'75ef5f'},body:JSON.stringify({sessionId:'75ef5f',runId:'initial',hypothesisId:'H3',location:'src/main/voiceCommands.ts:launchDiscoveredApp',message:'Launching discovered app',data:{name:_app.name,kind:_app.kind,target:_app.target},timestamp:Date.now()})}).catch(()=>{})
+  // #endregion
   if (_app.kind === 'shortcut') {
     const _err = await shell.openPath(_app.target)
     if (_err) {
@@ -360,16 +366,18 @@ export async function resolveAndLaunch(
         return { ok: false, message: 'open_app requires appName' }
       }
 
+      const _alias = lookupWebAlias(_name)
+      // #region agent log
+      fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'75ef5f'},body:JSON.stringify({sessionId:'75ef5f',runId:'initial',hypothesisId:'H5',location:'src/main/voiceCommands.ts:resolveAndLaunch.open_app',message:'Resolving open_app route',data:{requestedName:_name,hasWebAlias:Boolean(_alias),aliasHomepage:_alias?.homepage},timestamp:Date.now()})}).catch(()=>{})
+      // #endregion
+      if (_alias) {
+        const { via } = await openInChrome(_alias.homepage)
+        return { ok: true, message: `Opened ${_name} (${_alias.homepage}, via ${via})` }
+      }
       const _match = await findBestApp(_name)
       if (_match) {
         await launchDiscoveredApp(_match)
         return { ok: true, message: `Launched ${_match.name}` }
-      }
-
-      const _alias = lookupWebAlias(_name)
-      if (_alias) {
-        const { via } = await openInChrome(_alias.homepage)
-        return { ok: true, message: `Opened ${_name} (${_alias.homepage}, via ${via})` }
       }
 
       const _fallback = `https://www.google.com/search?q=${encodeURIComponent(_name)}`
