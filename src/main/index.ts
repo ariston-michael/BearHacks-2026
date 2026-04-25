@@ -85,7 +85,8 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      backgroundThrottling: false
     }
   })
 
@@ -158,6 +159,22 @@ app.whenReady().then(() => {
       await mouse.leftClick()
     } catch (error) {
       console.error('[ipc cursor:click] failed', error)
+    }
+  })
+
+  ipcMain.handle('cursor:mouseDown', async () => {
+    try {
+      await mouse.pressButton(Button.LEFT)
+    } catch (error) {
+      console.error('[ipc cursor:mouseDown] failed', error)
+    }
+  })
+
+  ipcMain.handle('cursor:mouseUp', async () => {
+    try {
+      await mouse.releaseButton(Button.LEFT)
+    } catch (error) {
+      console.error('[ipc cursor:mouseUp] failed', error)
     }
   })
 
