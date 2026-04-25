@@ -11,6 +11,15 @@ const electronAPI = {
     },
     invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args)
   },
+  cursor: {
+    move: (x: number, y: number) => ipcRenderer.invoke('cursor:move', x, y),
+    click: () => ipcRenderer.invoke('cursor:click'),
+    rightClick: () => ipcRenderer.invoke('cursor:rightClick'),
+    scroll: (deltaY: number) => ipcRenderer.invoke('cursor:scroll', deltaY)
+  },
+  keyboard: {
+    shortcut: (keys: string[]) => ipcRenderer.invoke('keyboard:shortcut', keys)
+  },
   process: {
     platform: process.platform,
     versions: process.versions
