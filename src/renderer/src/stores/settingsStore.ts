@@ -1,19 +1,45 @@
-// Zustand store for user-configurable settings: cursor sensitivity, smoothing alpha,
-// gesture bindings, active camera index, and per-gesture enable/disable toggles.
-// Persisted to disk via electron-store through the IPC bridge.
+// Zustand store for user-configurable settings: cursor sensitivity, click delay,
+// selected camera, and calibration profile. Persisted to disk via the
+// electronStorePersist middleware, which proxies through Electron IPC to the
+// main-process electron-store instance.
+//
+// Note: `isActive` is intentionally excluded from persistence so the app always
+// boots in an inactive state.
 
 import { create } from 'zustand'
+import type { AppSettings, CalibrationProfile } from '../types'
+import { electronStorePersist } from './electronStorePersist'
 
-interface SettingsState {
-  sensitivity: number
-  smoothingAlpha: number
-  setSensitivity: (v: number) => void
-  setSmoothingAlpha: (v: number) => void
+interface SettingsState extends AppSettings {
+  updateSettings: (_partial: Partial<AppSettings>) => void
+  resetToDefaults: () => void
+  setCalibration: (_profile: CalibrationProfile | null) => void
 }
 
-export const useSettingsStore = create<SettingsState>((set) => ({
+const DEFAULT_SETTINGS: AppSettings = {
   sensitivity: 1.0,
-  smoothingAlpha: 0.3,
-  setSensitivity: (v) => set({ sensitivity: v }),
-  setSmoothingAlpha: (v) => set({ smoothingAlpha: v }),
-}))
+  clickDelay: 250,
+  selectedCameraId: null,
+  calibration: null,
+  isActive: false
+}
+
+export const useSettingsStore = create<SettingsState>()(
+  electronStorePersist<SettingsState>(
+    (_set) => ({
+      ...DEFAULT_SETTINGS,
+      updateSettings: (_partial) => _set(_partial),
+      resetToDefaults: () => _set({ ...DEFAULT_SETTINGS }),
+      setCalibration: (_profile) => _set({ calibration: _profile })
+    }),
+    {
+      key: 'app-settings',
+      partialize: (_state) => ({
+        sensitivity: _state.sensitivity,
+        clickDelay: _state.clickDelay,
+        selectedCameraId: _state.selectedCameraId,
+        calibration: _state.calibration
+      })
+    }
+  )
+)
