@@ -1,4 +1,5 @@
 import CameraView from '../components/CameraView'
+import VoiceControlPanel from '../components/VoiceControlPanel'
 
 export default function DashboardPage(): React.JSX.Element {
   return (
@@ -7,6 +8,7 @@ export default function DashboardPage(): React.JSX.Element {
       <div className="flex-1 rounded-xl overflow-hidden border border-white/10">
         <CameraView />
       </div>
+      <VoiceControlPanel />
     </div>
   )
 }
