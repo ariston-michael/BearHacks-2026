@@ -7,7 +7,7 @@
 import { create } from 'zustand'
 import type { TranscriptSegment } from '../lib/speechRecognition'
 
-type VoiceIntentAction =
+export type VoiceIntentAction =
   | 'open_app'
   | 'search_web'
   | 'scroll_up'
@@ -23,6 +23,11 @@ export interface VoiceIntent {
   raw: string
 }
 
+export interface VoiceActionResult {
+  ok: boolean
+  message: string
+}
+
 interface VoiceState {
   isListening: boolean
   isRecording: boolean
@@ -30,6 +35,7 @@ interface VoiceState {
   transcript: string
   lastSegments: TranscriptSegment[]
   lastIntent: VoiceIntent | null
+  lastActionResult: VoiceActionResult | null
   errorMessage: string | null
   setIsListening: (_value: boolean) => void
   setIsRecording: (_value: boolean) => void
@@ -37,6 +43,7 @@ interface VoiceState {
   setTranscript: (_value: string) => void
   setLastSegments: (_value: TranscriptSegment[]) => void
   setLastIntent: (_value: VoiceIntent | null) => void
+  setLastActionResult: (_value: VoiceActionResult | null) => void
   setErrorMessage: (_value: string | null) => void
   appendTranscript: (_text: string, _segments: TranscriptSegment[]) => void
   clearVoiceState: () => void
@@ -49,6 +56,7 @@ export const useVoiceStore = create<VoiceState>((_set) => ({
   transcript: '',
   lastSegments: [],
   lastIntent: null,
+  lastActionResult: null,
   errorMessage: null,
   setIsListening: (_value) => _set({ isListening: _value }),
   setIsRecording: (_value) => _set({ isRecording: _value }),
@@ -56,6 +64,7 @@ export const useVoiceStore = create<VoiceState>((_set) => ({
   setTranscript: (_value) => _set({ transcript: _value }),
   setLastSegments: (_value) => _set({ lastSegments: _value }),
   setLastIntent: (_value) => _set({ lastIntent: _value }),
+  setLastActionResult: (_value) => _set({ lastActionResult: _value }),
   setErrorMessage: (_value) => _set({ errorMessage: _value }),
   appendTranscript: (_text, _segments) =>
     _set((_state) => ({
@@ -67,6 +76,7 @@ export const useVoiceStore = create<VoiceState>((_set) => ({
       transcript: '',
       lastSegments: [],
       lastIntent: null,
+      lastActionResult: null,
       errorMessage: null,
       audioLevel: 0,
       isRecording: false

@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'Dashboard' },
   { to: '/calibration', label: 'Calibration' },
   { to: '/settings', label: 'Settings' },
-  { to: '/tutorial', label: 'Tutorial' },
+  { to: '/tutorial', label: 'Tutorial' }
 ]
 
 function Sidebar(): React.JSX.Element {
@@ -22,9 +22,7 @@ function Sidebar(): React.JSX.Element {
           end={to === '/'}
           className={({ isActive }) =>
             `rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              isActive
-                ? 'bg-accent text-white'
-                : 'text-white/60 hover:bg-white/10 hover:text-white'
+              isActive ? 'bg-accent text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
             }`
           }
         >
@@ -40,7 +38,7 @@ function App(): React.JSX.Element {
     <HashRouter>
       <div className="dark flex h-screen w-screen overflow-hidden bg-[#0a0a1a] text-white">
         <Sidebar />
-        <main className="flex-1 overflow-auto p-8">
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto p-8" data-voice-scroll-root>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/calibration" element={<CalibrationPage />} />

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { VoiceExecuteIntentPayload, VoiceExecuteIntentResult } from '../shared/voiceIpc'
 
 const electronAPI = {
   ipcRenderer: {
@@ -17,7 +18,12 @@ const electronAPI = {
   }
 }
 
-const api = {}
+const api = {
+  voice: {
+    executeIntent: (_payload: VoiceExecuteIntentPayload): Promise<VoiceExecuteIntentResult> =>
+      ipcRenderer.invoke('voice:executeIntent', _payload) as Promise<VoiceExecuteIntentResult>
+  }
+}
 
 if (process.contextIsolated) {
   try {

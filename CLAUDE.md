@@ -23,4 +23,4 @@ Define proper TypeScript types in src/renderer/src/types/index.ts for:
 - HandLandmark (matches MediaPipe's structure)
 - CalibrationProfile
 
-Don't touch src/main/, src/preload/, or electron.vite.config.ts.
+Exception: voice command execution may add narrow IPC in `src/main/index.ts` and `src/preload/index.ts` (`voice:executeIntent` for `search_web` / `open_app` only). Otherwise do not touch main, preload, or electron.vite.config.ts.
