@@ -15,14 +15,25 @@ export function mapHandToCursor(
   landmark: NormalizedPoint,
   screenWidth: number,
   screenHeight: number,
-  sensitivity = 1.0
+  sensitivity = 1.0,
+  calibrationBounds?: { minX: number; maxX: number; minY: number; maxY: number } | null
 ): CursorPoint {
   const safeWidth = Math.max(1, screenWidth)
   const safeHeight = Math.max(1, screenHeight)
   const safeSensitivity = Math.max(0, sensitivity)
 
-  const xNorm = clamp(landmark.x, 0, 1)
-  const yNorm = clamp(landmark.y, 0, 1)
+  let rawX = landmark.x
+  let rawY = landmark.y
+
+  if (calibrationBounds) {
+    const rangeX = calibrationBounds.maxX - calibrationBounds.minX || 1
+    const rangeY = calibrationBounds.maxY - calibrationBounds.minY || 1
+    rawX = (rawX - calibrationBounds.minX) / rangeX
+    rawY = (rawY - calibrationBounds.minY) / rangeY
+  }
+
+  const xNorm = clamp(rawX, 0, 1)
+  const yNorm = clamp(rawY, 0, 1)
 
   // Convert to centered space where (0, 0) is screen center and axis range is [-1, 1].
   let centeredX = (xNorm - 0.5) * 2 * safeSensitivity

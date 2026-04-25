@@ -1,4 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSettingsStore } from '../stores/settingsStore'
+import CameraView from '../components/CameraView'
+import { NormalizedLandmark } from '@mediapipe/hands'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,48 +102,122 @@ export default function SettingsPage() {
   const [sensitivity, setSensitivity] = useState(1.0)
   const [clickDelay, setClickDelay] = useState(100)
   const [cameras, setCameras] = useState<CameraDevice[]>([])
-  const [selectedCamera, setSelectedCamera] = useState<string>('')
+  const [audios, setAudios] = useState<CameraDevice[]>([])
+  const selectedCameraId = useSettingsStore((state) => state.selectedCameraId)
+  const setSelectedCameraId = useSettingsStore((state) => state.setSelectedCameraId)
+  const selectedAudioId = useSettingsStore((state) => state.selectedAudioId)
+  const setSelectedAudioId = useSettingsStore((state) => state.setSelectedAudioId)
+  const selectedCameraLabel = cameras.find((cam) => cam.deviceId === selectedCameraId)?.label
+  const selectedAudioLabel = audios.find((aud) => aud.deviceId === selectedAudioId)?.label
+  const [screenResolution, setScreenResolution] = useState<{ width: number; height: number } | null>(null)
   const [isPaused, setIsPaused] = useState(false)
-  const [calibrateFlash, setCalibrateFlash] = useState(false)
-  const [camerasLoading, setCamerasLoading] = useState(true)
-  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isCalibrating = useSettingsStore((state) => state.isCalibrating)
+  const setIsCalibrating = useSettingsStore((state) => state.setIsCalibrating)
+  const setCalibrationBounds = useSettingsStore((state) => state.setCalibrationBounds)
+  const [mediaLoading, setMediaLoading] = useState(true)
+  const calibrationPoints = useRef<{x: number, y: number}[]>([])
+  const [calibrationCountdown, setCalibrationCountdown] = useState(5)
+  const countdownTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // ── Camera enumeration ─────────────────────────────────────────────────────
-  useEffect(() => {
-    async function loadCameras() {
-      try {
-        // Trigger permission prompt so labels are populated
-        await navigator.mediaDevices.getUserMedia({ video: true }).then((s) =>
-          s.getTracks().forEach((t) => t.stop())
-        )
-        const devices = await navigator.mediaDevices.enumerateDevices()
-        const videoInputs = devices
-          .filter((d) => d.kind === 'videoinput')
-          .map((d, i) => ({
-            deviceId: d.deviceId,
-            label: d.label || `Camera ${i + 1}`,
-          }))
-        setCameras(videoInputs)
-        if (videoInputs.length > 0 && !selectedCamera) {
-          setSelectedCamera(videoInputs[0].deviceId)
+  // ── Media enumeration ─────────────────────────────────────────────────────
+  const loadMediaDevices = useCallback(async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((s) =>
+        s.getTracks().forEach((t) => t.stop())
+      )
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      
+      const videoInputs = devices
+        .filter((d) => d.kind === 'videoinput')
+        .map((d, i) => ({
+          deviceId: d.deviceId,
+          label: (d.label || `Camera ${i + 1}`).replace(/\s*\([^)]+\)\s*$/, '').trim(),
+        }))
+
+      const audioInputs = devices
+        .filter((d) => d.kind === 'audioinput')
+        .map((d, i) => ({
+          deviceId: d.deviceId,
+          label: (d.label || `Microphone ${i + 1}`).replace(/\s*\([^)]+\)\s*$/, '').trim(),
+        }))
+
+      setCameras(videoInputs)
+      setAudios(audioInputs)
+      
+      if (videoInputs.length > 0) {
+        const hasSelected = videoInputs.some((cam) => cam.deviceId === selectedCameraId)
+        if (!selectedCameraId || !hasSelected) {
+          setSelectedCameraId(videoInputs[0].deviceId)
         }
-      } catch {
-        // Permission denied or no cameras
-        setCameras([])
-      } finally {
-        setCamerasLoading(false)
       }
+      
+      if (audioInputs.length > 0) {
+        const hasSelected = audioInputs.some((aud) => aud.deviceId === selectedAudioId)
+        if (!selectedAudioId || !hasSelected) {
+          setSelectedAudioId(audioInputs[0].deviceId)
+        }
+      }
+    } catch {
+      setCameras([])
+      setAudios([])
+    } finally {
+      setMediaLoading(false)
     }
-    loadCameras()
+  }, [selectedCameraId, setSelectedCameraId, selectedAudioId, setSelectedAudioId])
+
+  useEffect(() => {
+    loadMediaDevices()
     return () => {
-      if (flashTimer.current) clearTimeout(flashTimer.current)
+      if (countdownTimer.current) clearInterval(countdownTimer.current)
+    }
+  }, [loadMediaDevices])
+
+  useEffect(() => {
+    const updateResolution = () => {
+      setScreenResolution({ width: window.screen.width, height: window.screen.height })
+    }
+
+    updateResolution()
+    window.addEventListener('resize', updateResolution)
+    return () => {
+      window.removeEventListener('resize', updateResolution)
     }
   }, [])
 
+  function handleRefreshMedia() {
+    setMediaLoading(true)
+    loadMediaDevices()
+  }
+
   // ── Handlers ───────────────────────────────────────────────────────────────
   function handleRecalibrate() {
-    setCalibrateFlash(true)
-    flashTimer.current = setTimeout(() => setCalibrateFlash(false), 1200)
+    setIsCalibrating(true)
+    setCalibrationCountdown(5)
+    calibrationPoints.current = []
+
+    if (countdownTimer.current) clearInterval(countdownTimer.current)
+    countdownTimer.current = setInterval(() => {
+      setCalibrationCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownTimer.current!)
+          setIsCalibrating(false)
+          
+          const pts = calibrationPoints.current
+          if (pts.length > 0) {
+            const minX = Math.min(...pts.map(p => p.x))
+            const maxX = Math.max(...pts.map(p => p.x))
+            const minY = Math.min(...pts.map(p => p.y))
+            const maxY = Math.max(...pts.map(p => p.y))
+            // Only update if range is somewhat valid (not just a single point)
+            if (maxX - minX > 0.05 && maxY - minY > 0.05) {
+              setCalibrationBounds({ minX, maxX, minY, maxY })
+            }
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -231,21 +308,32 @@ export default function SettingsPage() {
           </SettingsCard>
         </section>
 
-        {/* ── 3. Camera Selection ── */}
+        {/* ── 3. Media Devices ── */}
         <section>
           <SectionHeader
-            label="Camera"
-            description="Select the input device for hand detection. Your Pixel 6 via DroidCam will appear here."
+            label="Media Devices"
+            description="Select the hardware used for gesture and voice detection. Hardware IDs are hidden for a cleaner look."
           />
+          
           <SettingsCard>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-zinc-300 font-medium">Input Device</span>
-              {camerasLoading && (
-                <span className="text-[11px] text-zinc-600 animate-pulse">Detecting…</span>
-              )}
+              <span className="text-sm text-zinc-300 font-medium">Camera</span>
+              <div className="flex items-center gap-2">
+                {mediaLoading ? (
+                  <span className="text-[11px] text-zinc-600 animate-pulse">Detecting…</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRefreshMedia}
+                    className="text-[11px] text-indigo-300 hover:text-white transition-colors"
+                  >
+                    Refresh
+                  </button>
+                )}
+              </div>
             </div>
 
-            {!camerasLoading && cameras.length === 0 ? (
+            {!mediaLoading && cameras.length === 0 ? (
               <div className="flex items-center gap-2 text-zinc-500 text-sm py-1">
                 <span className="text-red-400">✕</span>
                 No cameras found — check browser permissions.
@@ -253,9 +341,9 @@ export default function SettingsPage() {
             ) : (
               <div className="relative">
                 <select
-                  value={selectedCamera}
-                  onChange={(e) => setSelectedCamera(e.target.value)}
-                  disabled={camerasLoading}
+                  value={selectedCameraId}
+                  onChange={(e) => setSelectedCameraId(e.target.value)}
+                  disabled={mediaLoading}
                   className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-white pr-9 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-indigo-500 transition-all disabled:opacity-40 cursor-pointer"
                 >
                   {cameras.map((cam) => (
@@ -264,7 +352,6 @@ export default function SettingsPage() {
                     </option>
                   ))}
                 </select>
-                {/* Chevron icon */}
                 <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -276,6 +363,47 @@ export default function SettingsPage() {
             {cameras.length > 0 && (
               <p className="mt-2 text-[11px] text-zinc-600">
                 {cameras.length} device{cameras.length !== 1 ? 's' : ''} found
+                {selectedCameraLabel ? ` · Active: ${selectedCameraLabel}` : ''}
+              </p>
+            )}
+          </SettingsCard>
+
+          <SettingsCard>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-zinc-300 font-medium">Microphone</span>
+            </div>
+
+            {!mediaLoading && audios.length === 0 ? (
+              <div className="flex items-center gap-2 text-zinc-500 text-sm py-1">
+                <span className="text-amber-400">⚠</span>
+                No audio inputs found — check browser permissions.
+              </div>
+            ) : (
+              <div className="relative">
+                <select
+                  value={selectedAudioId}
+                  onChange={(e) => setSelectedAudioId(e.target.value)}
+                  disabled={mediaLoading}
+                  className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-white pr-9 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-indigo-500 transition-all disabled:opacity-40 cursor-pointer"
+                >
+                  {audios.map((aud) => (
+                    <option key={aud.deviceId} value={aud.deviceId}>
+                      {aud.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            )}
+
+            {audios.length > 0 && (
+              <p className="mt-2 text-[11px] text-zinc-600">
+                {audios.length} device{audios.length !== 1 ? 's' : ''} found
+                {selectedAudioLabel ? ` · Active: ${selectedAudioLabel}` : ''}
               </p>
             )}
           </SettingsCard>
@@ -285,7 +413,7 @@ export default function SettingsPage() {
         <section>
           <SectionHeader
             label="Calibration"
-            description="Map your natural hand range to the full screen area. Takes about 30 seconds."
+            description={`Map your natural hand range to the full screen area. Current screen resolution: ${screenResolution?.width ?? '-'}×${screenResolution?.height ?? '-'}.`}
           />
           <SettingsCard>
             <div className="flex items-center justify-between">
@@ -298,24 +426,24 @@ export default function SettingsPage() {
               <button
                 onClick={handleRecalibrate}
                 className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all duration-200 overflow-hidden ${
-                  calibrateFlash
+                  isCalibrating
                     ? 'bg-indigo-600 border-indigo-500 text-white'
                     : 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-indigo-600/20 hover:border-indigo-500/50 hover:text-indigo-300'
                 }`}
               >
-                {calibrateFlash ? (
+                {isCalibrating ? (
                   <>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="animate-spin">
                       <circle cx="7" cy="7" r="5.5" stroke="white" strokeWidth="1.5" strokeDasharray="8 6"/>
                     </svg>
-                    Starting…
+                    Calibrating...
                   </>
                 ) : (
                   <>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                       <path d="M7 1v2M7 11v2M1 7h2M11 7h2M3.05 3.05l1.42 1.42M9.54 9.54l1.41 1.41M9.54 4.46L10.95 3.05M3.05 10.95l1.42-1.41" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
                     </svg>
-                    Recalibrate
+                    Recalibrate for current display
                   </>
                 )}
               </button>
@@ -380,6 +508,40 @@ export default function SettingsPage() {
         {/* ── Bottom spacer ── */}
         <div className="h-6" />
       </div>
+
+      {/* ── Calibration Overlay ── */}
+      {isCalibrating && (
+        <div className="fixed inset-0 z-50 bg-zinc-950/95 backdrop-blur-md flex flex-col items-center justify-center">
+          <div className="text-center mb-8">
+            <h2 className="text-4xl font-bold text-white mb-3">Calibration in Progress</h2>
+            <p className="text-xl text-indigo-400 mb-2">
+              Move your hand to all 4 corners of your screen.
+            </p>
+            <p className="text-3xl font-mono text-emerald-400 font-bold mt-6">
+              {calibrationCountdown}s
+            </p>
+          </div>
+          <div className="w-[640px] h-[480px] rounded-2xl overflow-hidden shadow-[0_0_60px_rgba(99,102,241,0.2)] border-2 border-indigo-500/30">
+            <CameraView 
+              onLandmarks={(lms: NormalizedLandmark[]) => {
+                // Use index 9 (middle finger MCP) as a stable center point for the hand
+                if (lms && lms[9]) {
+                  calibrationPoints.current.push({ x: lms[9].x, y: lms[9].y })
+                }
+              }} 
+            />
+          </div>
+          <button
+            onClick={() => {
+              setIsCalibrating(false)
+              if (countdownTimer.current) clearInterval(countdownTimer.current)
+            }}
+            className="mt-8 px-6 py-2 rounded-full bg-zinc-800 text-white hover:bg-zinc-700 transition-colors"
+          >
+            Cancel Calibration
+          </button>
+        </div>
+      )}
     </div>
   )
 }

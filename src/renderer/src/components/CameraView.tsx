@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
-import { Hands, HAND_CONNECTIONS, Results } from '@mediapipe/hands'
-import { Camera } from '@mediapipe/camera_utils'
+import { Hands, HAND_CONNECTIONS, Results, NormalizedLandmark } from '@mediapipe/hands'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils'
+import { useSettingsStore } from '../stores/settingsStore'
 
 const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240'
 
-export default function CameraView(): React.JSX.Element {
+interface CameraViewProps {
+  onLandmarks?: (landmarks: NormalizedLandmark[]) => void
+}
+
+export default function CameraView({ onLandmarks }: CameraViewProps = {}): React.JSX.Element {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const handsRef = useRef<Hands | null>(null)
-  const cameraRef = useRef<Camera | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const rafRef = useRef<number | null>(null)
   const fpsRef = useRef({ frames: 0, lastTick: Date.now() })
+
+  const selectedCameraId = useSettingsStore((state) => state.selectedCameraId)
 
   const [error, setError] = useState<string | null>(null)
   const [handCount, setHandCount] = useState(0)
@@ -25,7 +32,6 @@ export default function CameraView(): React.JSX.Element {
     if (!ctx) return
 
     const onResults = (results: Results): void => {
-      // Sync canvas buffer size to actual video resolution
       if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
         canvas.width = video.videoWidth || 640
         canvas.height = video.videoHeight || 480
@@ -38,6 +44,10 @@ export default function CameraView(): React.JSX.Element {
 
       setHandCount(landmarks.length)
 
+      if (onLandmarks && landmarks.length > 0) {
+        onLandmarks(landmarks[0])
+      }
+
       for (let i = 0; i < landmarks.length; i++) {
         const lm = landmarks[i]
         const label = handedness[i]?.label ?? ''
@@ -45,13 +55,7 @@ export default function CameraView(): React.JSX.Element {
         drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: '#00ff88', lineWidth: 2 })
         drawLandmarks(ctx, lm, { color: '#ff4444', fillColor: '#ff4444', lineWidth: 1, radius: 4 })
 
-        // With selfieMode=false (default), MediaPipe labels are camera-perspective:
-        // "Right" = camera's right = user's LEFT. Flip for display.
         const displayLabel = label === 'Right' ? 'LEFT' : 'RIGHT'
-
-        // Draw label — flip context so text renders forward-readable under CSS scaleX(-1).
-        // In this transform (scale(-1,1) + translate(-W,0)), drawing at (px,py) places
-        // the text at screen position (px,py). The wrist's screen x = (1-wrist.x)*W.
         const wrist = lm[0]
         const screenX = (1 - wrist.x) * canvas.width
         const screenY = Math.max(wrist.y * canvas.height - 12, 16)
@@ -65,7 +69,6 @@ export default function CameraView(): React.JSX.Element {
         ctx.restore()
       }
 
-      // FPS
       fpsRef.current.frames++
       const now = Date.now()
       if (now - fpsRef.current.lastTick >= 1000) {
@@ -76,46 +79,62 @@ export default function CameraView(): React.JSX.Element {
     }
 
     let hands: Hands
-    let camera: Camera
+    let isActive = true
 
-    try {
-      hands = new Hands({ locateFile: (f) => `${MEDIAPIPE_CDN}/${f}` })
-      handsRef.current = hands
+    const startCamera = async () => {
+      try {
+        hands = new Hands({ locateFile: (f) => `${MEDIAPIPE_CDN}/${f}` })
+        handsRef.current = hands
 
-      hands.setOptions({
-        maxNumHands: 2,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.5
-      })
+        hands.setOptions({
+          maxNumHands: 2,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.7,
+          minTrackingConfidence: 0.5,
+        })
 
-      hands.onResults(onResults)
+        hands.onResults(onResults)
 
-      camera = new Camera(video, {
-        onFrame: async () => {
-          await hands.send({ image: video })
-        },
-        width: 640,
-        height: 480
-      })
-      cameraRef.current = camera
+        const constraints: MediaStreamConstraints = {
+          video: {
+            width: 640,
+            height: 480,
+            deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined,
+          },
+          audio: false,
+        }
 
-      camera.start().catch((err: Error) => {
-        setError(`Camera error: ${err.message}`)
-      })
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      setError(`MediaPipe initialization error: ${msg}`)
-      return
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        streamRef.current = stream
+        video.srcObject = stream
+        await video.play()
+
+        const render = async () => {
+          if (!isActive) return
+          if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            await hands.send({ image: video })
+          }
+          rafRef.current = requestAnimationFrame(render)
+        }
+
+        render()
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setError(`Camera error: ${msg}`)
+      }
     }
+
+    startCamera()
 
     return () => {
-      cameraRef.current?.stop()
+      isActive = false
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      streamRef.current?.getTracks().forEach((track) => track.stop())
       handsRef.current?.close()
       handsRef.current = null
-      cameraRef.current = null
+      streamRef.current = null
     }
-  }, [])
+  }, [selectedCameraId])
 
   if (error) {
     return (
