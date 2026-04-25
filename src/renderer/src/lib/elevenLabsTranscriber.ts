@@ -15,6 +15,7 @@ import type {
 } from './speechRecognition'
 
 const ELEVENLABS_STT_ENDPOINT = 'https://api.elevenlabs.io/v1/speech-to-text'
+const ELEVENLABS_ISOLATION_ENDPOINT = 'https://api.elevenlabs.io/v1/audio-isolation/stream'
 const DEFAULT_MODEL_ID = 'scribe_v1'
 
 export interface ElevenLabsTranscriberOptions {
@@ -22,6 +23,13 @@ export interface ElevenLabsTranscriberOptions {
   modelId?: string
   languageCode?: string
   diarize?: boolean
+  /**
+   * When true, each captured utterance is sent through ElevenLabs Audio
+   * Isolation before transcription, removing background noise and
+   * non-speech sounds. Adds one extra API round-trip per utterance.
+   * Defaults to false.
+   */
+  isolateAudio?: boolean
 }
 
 interface ScribeWord {
@@ -110,6 +118,7 @@ export class ElevenLabsScribeTranscriber implements SpeechTranscriber {
   private readonly m_modelId: string
   private readonly m_languageCode: string | undefined
   private readonly m_diarize: boolean
+  private readonly m_isolateAudio: boolean
   private readonly m_callbacks: SpeechTranscriberCallbacks
   private m_capture: UtteranceCapture | null = null
   private m_inflightRequests = 0
@@ -123,6 +132,7 @@ export class ElevenLabsScribeTranscriber implements SpeechTranscriber {
     this.m_modelId = _options.modelId ?? DEFAULT_MODEL_ID
     this.m_languageCode = _options.languageCode
     this.m_diarize = _options.diarize ?? true
+    this.m_isolateAudio = _options.isolateAudio ?? false
     this.m_callbacks = _callbacks
   }
 
@@ -163,8 +173,12 @@ export class ElevenLabsScribeTranscriber implements SpeechTranscriber {
   private async transcribeUtterance(_audio: Blob): Promise<void> {
     this.m_inflightRequests++
     try {
+      const _audioToTranscribe = this.m_isolateAudio
+        ? await this.denoiseAudio(_audio)
+        : _audio
+
       const _formData = new FormData()
-      _formData.append('file', _audio, 'utterance.webm')
+      _formData.append('file', _audioToTranscribe, 'utterance.webm')
       _formData.append('model_id', this.m_modelId)
       if (this.m_languageCode) {
         _formData.append('language_code', this.m_languageCode)
@@ -197,6 +211,40 @@ export class ElevenLabsScribeTranscriber implements SpeechTranscriber {
       this.m_callbacks.onError?.(_message)
     } finally {
       this.m_inflightRequests--
+    }
+  }
+
+  /**
+   * Sends an audio blob through the ElevenLabs Audio Isolation API to strip
+   * background noise. Returns the cleaned audio blob. If the request fails,
+   * logs a warning and returns the original blob so transcription still works.
+   */
+  private async denoiseAudio(_audio: Blob): Promise<Blob> {
+    try {
+      const _form = new FormData()
+      _form.append('audio', _audio, 'utterance.webm')
+
+      const _response = await fetch(ELEVENLABS_ISOLATION_ENDPOINT, {
+        method: 'POST',
+        headers: { 'xi-api-key': this.m_apiKey },
+        body: _form
+      })
+
+      if (!_response.ok) {
+        console.warn(
+          `[ElevenLabs] audio isolation failed (${_response.status}) — using original audio`
+        )
+        return _audio
+      }
+
+      const _cleanedBuffer = await _response.arrayBuffer()
+      if (_cleanedBuffer.byteLength === 0) {
+        return _audio
+      }
+      return new Blob([_cleanedBuffer], { type: 'audio/mpeg' })
+    } catch (_err) {
+      console.warn('[ElevenLabs] audio isolation request threw — using original audio:', _err)
+      return _audio
     }
   }
 }

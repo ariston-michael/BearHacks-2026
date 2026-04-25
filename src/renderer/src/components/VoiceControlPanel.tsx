@@ -56,7 +56,7 @@ export default function VoiceControlPanel(): React.JSX.Element {
     _setErrorMessage(null)
     try {
       const _transcriber = new ElevenLabsScribeTranscriber(
-        { apiKey: ELEVENLABS_API_KEY, diarize: true, languageCode: 'en' },
+        { apiKey: ELEVENLABS_API_KEY, diarize: true, languageCode: 'en', isolateAudio: true },
         {
           onStart: () => _setIsListening(true),
           onEnd: () => {
