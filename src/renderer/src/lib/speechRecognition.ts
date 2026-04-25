@@ -1,76 +1,34 @@
-export interface SpeechRecognizer {
-  start: () => void
-  stop: () => void
+// Generic speech-to-text contracts used by the voice control pipeline.
+//
+// The renderer talks to a SpeechTranscriber implementation (e.g. the
+// ElevenLabs Scribe transcriber) which is responsible for capturing audio,
+// detecting utterances, and producing diarized transcripts. This file is
+// transport-agnostic: it only defines types so the panel and store can stay
+// decoupled from any specific STT vendor.
+
+export interface TranscriptSegment {
+  text: string
+  speakerId: string | null
+  startSec: number
+  endSec: number
 }
 
-interface SpeechCallbacks {
+export interface TranscriptResult {
+  text: string
+  segments: TranscriptSegment[]
+}
+
+export interface SpeechTranscriberCallbacks {
   onStart?: () => void
   onEnd?: () => void
-  onResult: (_transcript: string) => void
+  onAudioLevel?: (_rms: number) => void
+  onRecordingStart?: () => void
+  onRecordingEnd?: () => void
+  onTranscript: (_result: TranscriptResult) => void
   onError?: (_message: string) => void
 }
 
-interface BrowserSpeechRecognitionConstructor {
-  new (): BrowserSpeechRecognition
-}
-
-interface BrowserSpeechRecognition extends EventTarget {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  start: () => void
+export interface SpeechTranscriber {
+  start: () => Promise<void>
   stop: () => void
-  onstart: (() => void) | null
-  onend: (() => void) | null
-  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null
-  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null
-}
-
-interface BrowserSpeechRecognitionAlternative {
-  transcript: string
-}
-
-interface BrowserSpeechRecognitionEvent {
-  results: ArrayLike<ArrayLike<BrowserSpeechRecognitionAlternative>>
-}
-
-interface BrowserSpeechRecognitionErrorEvent {
-  error: string
-}
-
-interface BrowserWindowWithSpeechRecognition extends Window {
-  webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor
-  SpeechRecognition?: BrowserSpeechRecognitionConstructor
-}
-
-export function createSpeechRecognizer(_callbacks: SpeechCallbacks): SpeechRecognizer {
-  const _window = window as BrowserWindowWithSpeechRecognition
-  const _SpeechRecognition = _window.SpeechRecognition ?? _window.webkitSpeechRecognition
-
-  if (!_SpeechRecognition) {
-    throw new Error('SpeechRecognition API is not available in this environment.')
-  }
-
-  const _recognizer = new _SpeechRecognition()
-  _recognizer.continuous = true
-  _recognizer.interimResults = false
-  _recognizer.lang = 'en-US'
-
-  _recognizer.onstart = () => _callbacks.onStart?.()
-  _recognizer.onend = () => _callbacks.onEnd?.()
-  _recognizer.onresult = (_event) => {
-    const _lastResult = _event.results[_event.results.length - 1]
-    const _transcript = _lastResult?.[0]?.transcript?.trim()
-    if (_transcript) {
-      _callbacks.onResult(_transcript)
-    }
-  }
-  _recognizer.onerror = (_event) => {
-    _callbacks.onError?.(_event.error ?? 'speech-recognition-error')
-  }
-
-  return {
-    start: () => _recognizer.start(),
-    stop: () => _recognizer.stop()
-  }
 }
