@@ -53,6 +53,7 @@ export async function dispatchVoiceIntent(_intent: VoiceIntent): Promise<VoiceEx
     action: _intent.action,
     query: _intent.query,
     appName: _intent.appName,
+    url: _intent.url,
     confidence: _intent.confidence
   }
 
@@ -65,6 +66,16 @@ export async function dispatchVoiceIntent(_intent: VoiceIntent): Promise<VoiceEx
     case 'open_app':
       if (!_intent.appName?.trim()) {
         return { ok: false, message: 'open_app requires appName' }
+      }
+      return invokeMain(_payload)
+    case 'open_url':
+      if (!_intent.url?.trim()) {
+        return { ok: false, message: 'open_url requires url' }
+      }
+      return invokeMain(_payload)
+    case 'open_app_with_query':
+      if (!_intent.appName?.trim() || !_intent.query?.trim()) {
+        return { ok: false, message: 'open_app_with_query requires appName and query' }
       }
       return invokeMain(_payload)
     case 'scroll_up':

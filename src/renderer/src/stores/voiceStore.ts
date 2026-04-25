@@ -9,6 +9,8 @@ import type { TranscriptSegment } from '../lib/speechRecognition'
 
 export type VoiceIntentAction =
   | 'open_app'
+  | 'open_url'
+  | 'open_app_with_query'
   | 'search_web'
   | 'scroll_up'
   | 'scroll_down'
@@ -19,6 +21,8 @@ export interface VoiceIntent {
   action: VoiceIntentAction
   query?: string
   appName?: string
+  /** Absolute URL (used by `open_url`). */
+  url?: string
   confidence: number
   raw: string
 }
