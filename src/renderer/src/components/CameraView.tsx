@@ -3,6 +3,7 @@ import { Hands, HAND_CONNECTIONS, Results } from '@mediapipe/hands'
 import { Camera } from '@mediapipe/camera_utils'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils'
 import { classifyGesture, GestureStabilizer } from '../lib/gestureClassifier'
+import { useGestureControl } from '../hooks/useGestureControl'
 
 const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240'
 
@@ -14,6 +15,7 @@ export default function CameraView(): React.JSX.Element {
   const fpsRef = useRef({ frames: 0, lastTick: Date.now() })
   const leftStabilizerRef = useRef(new GestureStabilizer(3))
   const rightStabilizerRef = useRef(new GestureStabilizer(3))
+  const { processFrame } = useGestureControl()
 
   const [error, setError] = useState<string | null>(null)
   const [handCount, setHandCount] = useState(0)
@@ -55,6 +57,8 @@ export default function CameraView(): React.JSX.Element {
         const raw = classifyGesture(lm, side)
         const stabilizer = side === 'left' ? leftStabilizerRef.current : rightStabilizerRef.current
         const gesture = stabilizer.update(raw)
+
+        if (side === 'right') processFrame(lm, gesture)
 
         // Draw label — flip context so text renders forward-readable under CSS scaleX(-1).
         // In this transform (scale(-1,1) + translate(-W,0)), drawing at (px,py) places
