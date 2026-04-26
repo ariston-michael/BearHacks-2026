@@ -291,13 +291,8 @@ export default function VoiceControlPanel(): React.JSX.Element {
     <section className="rounded-xl border border-white/10 bg-white/5 p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-white">
-            Voice Control (ElevenLabs Scribe + Vultr Gemma 4)
-          </h2>
-          <p className="mt-1 text-sm text-white/60">
-            Energy-VAD + ElevenLabs Scribe for transcription, Vultr Gemma 4 for intent + action
-            (search, open app, scroll). Speak a phrase, pause, and results appear below.
-          </p>
+          <h2 className="text-lg font-semibold text-white">AirFlow Audio</h2>
+          
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {_isWakeWordMode && (
