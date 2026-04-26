@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Hands, HAND_CONNECTIONS, Results } from '@mediapipe/hands'
+import { Hands, HAND_CONNECTIONS, Results, NormalizedLandmarkList } from '@mediapipe/hands'
 import { Camera } from '@mediapipe/camera_utils'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils'
+import { classifyGesture, GestureStabilizer } from '../lib/gestureClassifier'
+import { useGestureControl } from '../hooks/useGestureControl'
+import { useLeftHandControl } from '../hooks/useLeftHandControl'
+import { GestureName } from '../types'
 
 const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240'
 
@@ -10,7 +14,11 @@ export default function CameraView(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const handsRef = useRef<Hands | null>(null)
   const cameraRef = useRef<Camera | null>(null)
-  const fpsRef = useRef({ frames: 0, lastTick: Date.now() })
+  const fpsRef = useRef({ frames: 0, lastTick: 0 })
+  const leftStabilizerRef = useRef(new GestureStabilizer(3))
+  const rightStabilizerRef = useRef(new GestureStabilizer(3))
+  const { processFrame, isPrecisionMode } = useGestureControl()
+  const { processLeftFrame } = useLeftHandControl()
 
   const [error, setError] = useState<string | null>(null)
   const [handCount, setHandCount] = useState(0)
@@ -38,36 +46,55 @@ export default function CameraView(): React.JSX.Element {
 
       setHandCount(landmarks.length)
 
-      for (let i = 0; i < landmarks.length; i++) {
-        const lm = landmarks[i]
+      // Phase 1: classify + stabilize every detected hand so the left-hand
+      // gesture is known before we call processFrame for the right hand.
+      type HandData = {
+        lm: NormalizedLandmarkList
+        gesture: GestureName
+        displaySide: 'LEFT' | 'RIGHT'
+        side: 'left' | 'right'
+      }
+      const classified: HandData[] = landmarks.map((lm, i) => {
         const label = handedness[i]?.label ?? ''
+        const displaySide = label === 'Right' ? 'LEFT' : 'RIGHT'
+        const side: 'left' | 'right' = displaySide === 'LEFT' ? 'left' : 'right'
+        const raw = classifyGesture(lm, side)
+        const stabilizer = side === 'left' ? leftStabilizerRef.current : rightStabilizerRef.current
+        return { lm, gesture: stabilizer.update(raw), displaySide, side }
+      })
 
+      const leftHand = classified.find((h) => h.side === 'left')
+      const leftGesture = leftHand?.gesture ?? 'none'
+
+      // Dispatch left-hand controls (scroll + 3D rotation).
+      processLeftFrame(leftHand?.lm ?? null, leftGesture)
+
+      // Phase 2: draw landmarks + labels, then dispatch cursor control.
+      for (const { lm, gesture, displaySide, side } of classified) {
         drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: '#00ff88', lineWidth: 2 })
         drawLandmarks(ctx, lm, { color: '#ff4444', fillColor: '#ff4444', lineWidth: 1, radius: 4 })
 
-        // With selfieMode=false (default), MediaPipe labels are camera-perspective:
-        // "Right" = camera's right = user's LEFT. Flip for display.
-        const displayLabel = label === 'Right' ? 'LEFT' : 'RIGHT'
+        if (side === 'right') processFrame(lm, gesture, leftGesture)
 
-        // Draw label — flip context so text renders forward-readable under CSS scaleX(-1).
-        // In this transform (scale(-1,1) + translate(-W,0)), drawing at (px,py) places
-        // the text at screen position (px,py). The wrist's screen x = (1-wrist.x)*W.
+        // Flip canvas context so the label text is readable under CSS scaleX(-1).
         const wrist = lm[0]
         const screenX = (1 - wrist.x) * canvas.width
         const screenY = Math.max(wrist.y * canvas.height - 12, 16)
-
         ctx.save()
         ctx.scale(-1, 1)
         ctx.translate(-canvas.width, 0)
         ctx.font = 'bold 14px monospace'
-        ctx.fillStyle = displayLabel === 'LEFT' ? '#6366f1' : '#22d3ee'
-        ctx.fillText(`${displayLabel} HAND`, screenX - 50, screenY)
+        ctx.fillStyle = displaySide === 'LEFT' ? '#6366f1' : '#22d3ee'
+        ctx.fillText(`${displaySide}: ${gesture}`, screenX - 50, screenY)
         ctx.restore()
       }
 
       // FPS
       fpsRef.current.frames++
       const now = Date.now()
+      if (fpsRef.current.lastTick === 0) {
+        fpsRef.current.lastTick = now
+      }
       if (now - fpsRef.current.lastTick >= 1000) {
         setFps(fpsRef.current.frames)
         fpsRef.current.frames = 0
@@ -105,7 +132,7 @@ export default function CameraView(): React.JSX.Element {
       })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      setError(`MediaPipe initialization error: ${msg}`)
+      queueMicrotask(() => setError(`MediaPipe initialization error: ${msg}`))
       return
     }
 
@@ -148,6 +175,13 @@ export default function CameraView(): React.JSX.Element {
         {handCount === 0 && (
           <div className="absolute inset-0 flex items-end justify-center pb-4 pointer-events-none">
             <span className="text-white/40 text-sm font-mono">No hands detected</span>
+          </div>
+        )}
+
+        {/* Precision mode badge */}
+        {isPrecisionMode && (
+          <div className="absolute top-2 left-2 bg-indigo-500/80 text-white text-xs font-mono font-bold px-2 py-1 rounded">
+            PRECISION
           </div>
         )}
 

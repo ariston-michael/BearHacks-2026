@@ -3,13 +3,14 @@
 
 export type GestureName =
   | 'pinch'
-  | 'palm'
   | 'fist'
+  | 'open-palm'
   | 'point'
+  | 'okay-sign'
   | 'c-shape'
-  | 'v-sign'
-  | 'ok-sign'
-  | null
+  | 'v-shape'
+  | 'thumbs-up'
+  | 'none'
 
 export interface Landmark {
   x: number

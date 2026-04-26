@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { VoiceExecuteIntentPayload, VoiceExecuteIntentResult } from '../shared/voiceIpc'
 
 const electronAPI = {
   ipcRenderer: {
@@ -11,13 +12,31 @@ const electronAPI = {
     },
     invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args)
   },
+  cursor: {
+    move: (x: number, y: number) => ipcRenderer.invoke('cursor:move', x, y),
+    click: () => ipcRenderer.invoke('cursor:click'),
+    rightClick: () => ipcRenderer.invoke('cursor:rightClick'),
+    scroll: (deltaY: number) => ipcRenderer.invoke('cursor:scroll', deltaY),
+    mouseDown: () => ipcRenderer.invoke('cursor:mouseDown'),
+    mouseUp: () => ipcRenderer.invoke('cursor:mouseUp'),
+    middleDown: () => ipcRenderer.invoke('cursor:middleDown'),
+    middleUp: () => ipcRenderer.invoke('cursor:middleUp'),
+  },
+  keyboard: {
+    shortcut: (keys: string[]) => ipcRenderer.invoke('keyboard:shortcut', keys)
+  },
   process: {
     platform: process.platform,
     versions: process.versions
   }
 }
 
-const api = {}
+const api = {
+  voice: {
+    executeIntent: (_payload: VoiceExecuteIntentPayload): Promise<VoiceExecuteIntentResult> =>
+      ipcRenderer.invoke('voice:executeIntent', _payload) as Promise<VoiceExecuteIntentResult>
+  }
+}
 
 if (process.contextIsolated) {
   try {
