@@ -64,7 +64,6 @@ export default function VoiceControlPanel(): React.JSX.Element {
   const _ttsRef = useRef<ElevenLabsTtsService | null>(null)
   // Holds the latest _startListening so startWakeWord can call it without a stale closure
   const _startListeningFnRef = useRef<() => Promise<void>>(async () => {})
-  const _ttsRef = useRef<ElevenLabsTtsService | null>(null)
   const [_isWakeWordMode, _setIsWakeWordMode] = useState(true)
 
   function getTts(): ElevenLabsTtsService {
@@ -77,7 +76,6 @@ export default function VoiceControlPanel(): React.JSX.Element {
   const _audioLevel = useVoiceStore((_state) => _state.audioLevel)
   const _transcript = useVoiceStore((_state) => _state.transcript)
   const _lastSegments = useVoiceStore((_state) => _state.lastSegments)
-  const _lastIntent = useVoiceStore((_state) => _state.lastIntent)
   const _lastActionResult = useVoiceStore((_state) => _state.lastActionResult)
   const _errorMessage = useVoiceStore((_state) => _state.errorMessage)
   const _setIsListening = useVoiceStore((_state) => _state.setIsListening)
@@ -305,7 +303,7 @@ export default function VoiceControlPanel(): React.JSX.Element {
           {_isWakeWordMode && (
             <span className="flex items-center gap-2 rounded-full bg-blue-500/20 px-3 py-1 text-xs font-semibold text-blue-300">
               <span className="inline-block h-2 w-2 rounded-full bg-blue-400 animate-flicker" />
-              Waiting for &ldquo;Hey Airflow&rdquo;
+              Waiting for &ldquo;Hey AirFlow&rdquo;
             </span>
           )}
           {_isListening && !_isWakeWordMode && (
@@ -421,17 +419,6 @@ export default function VoiceControlPanel(): React.JSX.Element {
               ))}
             </ul>
           )}
-        </div>
-
-        <div>
-          <div className="mb-1 text-white/50">Intent</div>
-          <div className="font-mono text-xs text-white">
-            {_lastIntent ? (
-              JSON.stringify(_lastIntent)
-            ) : (
-              <span className="text-white/30">(none yet)</span>
-            )}
-          </div>
         </div>
 
         <div>

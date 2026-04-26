@@ -2,7 +2,7 @@
 //
 // Uses the energy-VAD audio capture (audioCapture.ts) to detect short
 // utterances and ships each one to ElevenLabs Scribe for STT. If the returned
-// transcript contains the wake phrase "Hey Airflow" the onWakeWord callback
+// transcript contains the wake phrase "Hey Air Control" the onWakeWord callback
 // fires exactly once - the caller is responsible for stopping the detector and
 // starting the full ElevenLabs transcriber.
 //
@@ -24,12 +24,57 @@ const MIN_BLOB_BYTES = 1500
 const MAX_BLOB_BYTES = 80_000
 
 const WAKE_PHRASES = [
+  'hey air control',
+  'hay air control',
+  'air control',
   'hey airflow',
   'hey air flow',
-  'hey airflo',
-  'hey erflow',
-  'hey air-flow'
+  'hey air controller',
+  'hey aircraft control',
+  'hey hair control',
+  'air controller'
 ]
+
+function editDistance(_left: string, _right: string): number {
+  const _previous = Array.from({ length: _right.length + 1 }, (_, _i) => _i)
+  const _current = Array.from({ length: _right.length + 1 }, () => 0)
+
+  for (let _i = 1; _i <= _left.length; _i++) {
+    _current[0] = _i
+    for (let _j = 1; _j <= _right.length; _j++) {
+      const _cost = _left[_i - 1] === _right[_j - 1] ? 0 : 1
+      _current[_j] = Math.min(
+        _current[_j - 1] + 1,
+        _previous[_j] + 1,
+        _previous[_j - 1] + _cost
+      )
+    }
+    for (let _j = 0; _j <= _right.length; _j++) {
+      _previous[_j] = _current[_j]
+    }
+  }
+
+  return _previous[_right.length]
+}
+
+function similarity(_left: string, _right: string): number {
+  const _maxLength = Math.max(_left.length, _right.length)
+  if (_maxLength === 0) {
+    return 1
+  }
+  return 1 - editDistance(_left, _right) / _maxLength
+}
+
+function getNgrams(_words: string[], _size: number): string[] {
+  if (_words.length < _size) {
+    return []
+  }
+  const _grams: string[] = []
+  for (let _i = 0; _i <= _words.length - _size; _i++) {
+    _grams.push(_words.slice(_i, _i + _size).join(' '))
+  }
+  return _grams
+}
 
 export interface WakeWordCallbacks {
   apiKey: string
@@ -43,7 +88,16 @@ function containsWakePhrase(_text: string): boolean {
     .replace(/[^a-z ]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-  return WAKE_PHRASES.some((_phrase) => _normalized.includes(_phrase))
+  if (WAKE_PHRASES.some((_phrase) => _normalized.includes(_phrase))) {
+    return true
+  }
+
+  const _words = _normalized.split(' ').filter(Boolean)
+  return WAKE_PHRASES.some((_phrase) => {
+    const _phraseWords = _phrase.split(' ')
+    const _candidates = getNgrams(_words, _phraseWords.length)
+    return _candidates.some((_candidate) => similarity(_candidate, _phrase) >= 0.82)
+  })
 }
 
 interface ScribeResponse {

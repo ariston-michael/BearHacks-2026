@@ -416,6 +416,41 @@ export async function resolveAndLaunch(
       }
     }
 
+    if (_payload.action === 'unknown') {
+      const _url = (_payload.url ?? '').trim()
+      if (_url.length > 0) {
+        const { via } = await openInChrome(_url)
+        return { ok: true, message: `Opened ${_url} from unknown intent fallback (via ${via})` }
+      }
+
+      const _name = (_payload.appName ?? '').trim()
+      if (_name.length > 0) {
+        const _match = await findBestApp(_name)
+        if (_match) {
+          await launchDiscoveredApp(_match)
+          return { ok: true, message: `Launched ${_match.name} from unknown intent fallback` }
+        }
+
+        const _alias = lookupWebAlias(_name)
+        if (_alias) {
+          const { via } = await openInChrome(_alias.homepage)
+          return {
+            ok: true,
+            message: `Opened ${_name} (${_alias.homepage}) from unknown intent fallback (via ${via})`
+          }
+        }
+      }
+
+      const _query = (_payload.query ?? '').trim()
+      if (_query.length > 0) {
+        const _fallback = `https://www.google.com/search?q=${encodeURIComponent(_query)}`
+        const { via } = await openInChrome(_fallback)
+        return { ok: true, message: `Searched Google for "${_query}" from unknown intent fallback (via ${via})` }
+      }
+
+      return { ok: false, message: 'Unknown intent did not include actionable fields' }
+    }
+
     return { ok: false, message: `Action "${_payload.action}" is handled in the renderer` }
   } catch (_err) {
     const _message = _err instanceof Error ? _err.message : String(_err)

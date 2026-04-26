@@ -1,8 +1,6 @@
 import type { VoiceExecuteIntentPayload, VoiceExecuteIntentResult } from '../../../shared/voiceIpc'
 import type { VoiceIntent } from '../stores/voiceStore'
 
-const MIN_CONFIDENCE = 0.28
-
 function getScrollRoot(): HTMLElement {
   return document.querySelector<HTMLElement>('[data-voice-scroll-root]') ?? document.documentElement
 }
@@ -44,18 +42,8 @@ async function invokeMain(_payload: VoiceExecuteIntentPayload): Promise<VoiceExe
  */
 export async function dispatchVoiceIntent(_intent: VoiceIntent): Promise<VoiceExecuteIntentResult> {
   // #region agent log
-  fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'75ef5f'},body:JSON.stringify({sessionId:'75ef5f',runId:'initial',hypothesisId:'H2',location:'src/renderer/src/lib/voiceActionDispatcher.ts:dispatchVoiceIntent',message:'Renderer dispatch evaluated',data:{action:_intent.action,confidence:_intent.confidence,belowConfidence:_intent.confidence<MIN_CONFIDENCE,willStopAsUnknown:_intent.action==='unknown',hasLinkIndex:_intent.linkIndex!==undefined,hasLinkText:Boolean(_intent.linkText?.trim()),hasTargetIndex:_intent.targetIndex!==undefined,hasTargetText:Boolean(_intent.targetText?.trim()),targetKind:_intent.targetKind},timestamp:Date.now()})}).catch(()=>{})
+  fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'75ef5f'},body:JSON.stringify({sessionId:'75ef5f',runId:'initial',hypothesisId:'H2',location:'src/renderer/src/lib/voiceActionDispatcher.ts:dispatchVoiceIntent',message:'Renderer dispatch evaluated',data:{action:_intent.action,confidence:_intent.confidence,willStopAsUnknown:_intent.action==='unknown',hasLinkIndex:_intent.linkIndex!==undefined,hasLinkText:Boolean(_intent.linkText?.trim()),hasTargetIndex:_intent.targetIndex!==undefined,hasTargetText:Boolean(_intent.targetText?.trim()),targetKind:_intent.targetKind},timestamp:Date.now()})}).catch(()=>{})
   // #endregion
-  if (_intent.action === 'unknown') {
-    return { ok: false, message: 'No action (intent is unknown)' }
-  }
-  if (_intent.confidence < MIN_CONFIDENCE) {
-    return {
-      ok: false,
-      message: `Skipped: confidence ${_intent.confidence.toFixed(2)} below threshold ${MIN_CONFIDENCE}`
-    }
-  }
-
   const _payload: VoiceExecuteIntentPayload = {
     action: _intent.action,
     query: _intent.query,
@@ -123,6 +111,8 @@ export async function dispatchVoiceIntent(_intent: VoiceIntent): Promise<VoiceEx
         ? { ok: true, message: 'Clicked first button in main content' }
         : { ok: false, message: 'No clickable button found in main' }
     }
+    case 'unknown':
+      return invokeMain(_payload)
     default:
       return { ok: false, message: 'Unhandled action' }
   }

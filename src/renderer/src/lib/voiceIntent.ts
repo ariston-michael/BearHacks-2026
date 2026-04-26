@@ -53,6 +53,7 @@ Allowed actions:
 Return strict JSON. Shape:
 {"action":"<one of above>","query":"string?","appName":"string?","url":"string?","linkIndex":1,"linkText":"string?","anchorText":"string?","targetIndex":1,"targetText":"string?","targetKind":"song|album|podcast|artist|playlist|unknown","confidence":0.0}
 No markdown, no commentary, no extra keys.
+Prefer a concrete supported action whenever the transcript contains a recognizable command. Use unknown only for filler, backchannel, silence, or truly ambiguous speech.
 
 Routing rules (apply in order):
 1. Follow-up browser link selection by ordinal or visible text     -> select_link
@@ -91,7 +92,22 @@ Routing rules (apply in order):
 7. "search for X" / "look up X" / "google X" (no app named) -> search_web          (query=X)
    Examples: "search for the weather in tokyo" -> {"action":"search_web","query":"weather in tokyo","confidence":0.9}
 8. Scroll/click commands map to scroll_up, scroll_down, click.
-9. Anything else (greetings, fillers, unclear)              -> unknown             (low confidence)
+9. Elliptical / shortcut phrases (no verb, terse). Treat these as concrete actions, not unknown:
+   - Bare known app/service name (1-3 words) -> open_app (the host resolver will pick the installed app or homepage).
+     Examples: "spotify"   -> {"action":"open_app","appName":"spotify","confidence":0.85}
+               "notepad"   -> {"action":"open_app","appName":"notepad","confidence":0.85}
+               "discord"   -> {"action":"open_app","appName":"discord","confidence":0.85}
+               "youtube"   -> {"action":"open_url","url":"https://www.youtube.com","confidence":0.85}
+               "google maps" -> {"action":"open_url","url":"https://maps.google.com","confidence":0.85}
+   - "link <text>" / "click link <text>" / "<ordinal> link" / "<ordinal> one"  -> select_link
+     Examples: "link cookies"   -> {"action":"select_link","linkText":"cookies","confidence":0.85}
+               "first link"     -> {"action":"select_link","linkIndex":1,"confidence":0.85}
+               "third one"      -> {"action":"select_link","linkIndex":3,"confidence":0.8}
+               "click link wikipedia" -> {"action":"select_link","linkText":"wikipedia","confidence":0.9}
+   - Bare topical phrase (no verb, not a known app) -> search_web with the phrase as query.
+     Examples: "cookie recipes" -> {"action":"search_web","query":"cookie recipes","confidence":0.7}
+               "weather tokyo"  -> {"action":"search_web","query":"weather tokyo","confidence":0.7}
+10. Anything else (greetings, fillers, unclear)             -> unknown             (low confidence)
 
 When the input includes "Per-speaker lines" with multiple speakers, use those labels to:
 - identify which line is the real command (e.g. the user request vs. backchannel like "mm-hmm", "yeah");
@@ -189,6 +205,285 @@ function normalizeIntent(_intent: Partial<VoiceIntent> | null, _raw: string): Vo
   }
 }
 
+function cleanupQuery(_query: string): string {
+  return _query
+    .trim()
+    .replace(/^[.,;:\s]+/g, '')
+    .replace(/[.?!,;:\s]+$/g, '')
+    .replace(/\s+/g, ' ')
+}
+
+const ORDINAL_TO_INDEX: Record<string, number> = {
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+  fifth: 5,
+  sixth: 6,
+  seventh: 7,
+  eighth: 8,
+  ninth: 9,
+  tenth: 10
+}
+
+function ordinalToIndex(_token: string): number | null {
+  const _key = _token.toLowerCase().trim()
+  if (_key in ORDINAL_TO_INDEX) {
+    return ORDINAL_TO_INDEX[_key]
+  }
+  const _digits = _key.replace(/(?:st|nd|rd|th)$/g, '')
+  const _num = Number.parseInt(_digits, 10)
+  return Number.isFinite(_num) && _num > 0 ? _num : null
+}
+
+const SEARCH_TARGET_HOSTS = new Set([
+  'youtube',
+  'google',
+  'amazon',
+  'reddit',
+  'github',
+  'wikipedia',
+  'spotify'
+])
+
+/**
+ * Names the local fallback recognises as a bare app or web-service utterance.
+ * The main resolver in `voiceCommands.ts` will still decide between launching
+ * an installed app and opening a homepage; we just need to route as `open_app`.
+ */
+const KNOWN_APP_TOKENS = new Set<string>([
+  'spotify',
+  'youtube',
+  'gmail',
+  'google',
+  'google maps',
+  'maps',
+  'twitter',
+  'reddit',
+  'github',
+  'wikipedia',
+  'amazon',
+  'netflix',
+  'chatgpt',
+  'chat gpt',
+  'discord',
+  'slack',
+  'notepad',
+  'notepad++',
+  'calculator',
+  'paint',
+  'word',
+  'excel',
+  'powerpoint',
+  'outlook',
+  'teams',
+  'zoom',
+  'chrome',
+  'edge',
+  'firefox',
+  'brave',
+  'opera',
+  'safari',
+  'vscode',
+  'visual studio code',
+  'code',
+  'visual studio',
+  'terminal',
+  'cmd',
+  'powershell',
+  'file explorer',
+  'explorer',
+  'settings',
+  'control panel',
+  'task manager',
+  'steam',
+  'epic games',
+  'obs',
+  'figma',
+  'photoshop',
+  'illustrator'
+])
+
+interface LocalInferResult {
+  intent: VoiceIntent
+  /** Short tag for debug logging, e.g. "link-text", "app-bare". */
+  tag: string
+}
+
+function makeLocalIntent(
+  _partial: Omit<VoiceIntent, 'raw'>,
+  _transcript: string,
+  _tag: string
+): LocalInferResult {
+  return {
+    intent: { ..._partial, raw: `local-fallback:${_tag}:${_transcript}` },
+    tag: _tag
+  }
+}
+
+function inferLinkIntent(_transcript: string): LocalInferResult | null {
+  const _verbOrdinal = _transcript.match(
+    /^(?:click|open|select|tap|check|pick|choose)\s+(?:on\s+)?(?:the\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d+(?:st|nd|rd|th)?)\s+(?:link|result|one)$/i
+  )
+  if (_verbOrdinal) {
+    const _idx = ordinalToIndex(_verbOrdinal[1])
+    if (_idx !== null) {
+      return makeLocalIntent(
+        { action: 'select_link', linkIndex: _idx, confidence: 0.85 },
+        _transcript,
+        'link-ordinal-verb'
+      )
+    }
+  }
+
+  const _bareOrdinal = _transcript.match(
+    /^(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d+(?:st|nd|rd|th)?)\s+(?:link|result|one)$/i
+  )
+  if (_bareOrdinal) {
+    const _idx = ordinalToIndex(_bareOrdinal[1])
+    if (_idx !== null) {
+      return makeLocalIntent(
+        { action: 'select_link', linkIndex: _idx, confidence: 0.85 },
+        _transcript,
+        'link-ordinal-bare'
+      )
+    }
+  }
+
+  const _verbLink = _transcript.match(
+    /^(?:click|open|select|tap|check|pick|choose)\s+(?:on\s+)?(?:the\s+)?link\s+(?:that\s+says\s+|named\s+|called\s+)?(.+)$/i
+  )
+  if (_verbLink) {
+    const _text = cleanupQuery(_verbLink[1])
+    if (_text.length > 0) {
+      return makeLocalIntent(
+        { action: 'select_link', linkText: _text, confidence: 0.9 },
+        _transcript,
+        'link-verb-text'
+      )
+    }
+  }
+
+  const _bareLink = _transcript.match(/^link\s+(.+)$/i)
+  if (_bareLink) {
+    const _text = cleanupQuery(_bareLink[1])
+    const _idx = ordinalToIndex(_text)
+    if (_idx !== null) {
+      return makeLocalIntent(
+        { action: 'select_link', linkIndex: _idx, confidence: 0.85 },
+        _transcript,
+        'link-bare-ordinal'
+      )
+    }
+    if (_text.length > 0) {
+      return makeLocalIntent(
+        { action: 'select_link', linkText: _text, confidence: 0.85 },
+        _transcript,
+        'link-bare-text'
+      )
+    }
+  }
+
+  return null
+}
+
+function inferAppIntent(_transcript: string): LocalInferResult | null {
+  const _verbApp = _transcript.match(
+    /^(?:open|launch|start|run|fire\s+up|boot|bring\s+up)\s+(?:the\s+)?(.+)$/i
+  )
+  if (_verbApp) {
+    const _name = cleanupQuery(_verbApp[1])
+    if (_name.length > 0) {
+      return makeLocalIntent(
+        { action: 'open_app', appName: _name, confidence: 0.85 },
+        _transcript,
+        'app-verb'
+      )
+    }
+  }
+
+  const _normalised = cleanupQuery(_transcript).toLowerCase()
+  if (KNOWN_APP_TOKENS.has(_normalised)) {
+    return makeLocalIntent(
+      { action: 'open_app', appName: _normalised, confidence: 0.8 },
+      _transcript,
+      'app-bare'
+    )
+  }
+
+  return null
+}
+
+function inferSearchIntent(_transcript: string): LocalInferResult | null {
+  const _onSite = _transcript.match(
+    /^(?:please\s+)?(?:search|look\s+up|find)\s+(.+?)\s+(?:on|in|at)\s+(youtube|google|amazon|reddit|github|wikipedia|spotify)$/i
+  )
+  if (_onSite) {
+    const _query = cleanupQuery(_onSite[1])
+    const _site = _onSite[2].toLowerCase()
+    if (_query.length > 0 && SEARCH_TARGET_HOSTS.has(_site)) {
+      return makeLocalIntent(
+        { action: 'open_app_with_query', appName: _site, query: _query, confidence: 0.85 },
+        _transcript,
+        'search-on-site'
+      )
+    }
+  }
+
+  const _verbSearch = _transcript.match(
+    /^(?:please\s+)?(?:search(?:\s+(?:for|up))?|look\s+up|google|find|what\s+is|who\s+is|tell\s+me\s+about)\s+(.+)$/i
+  )
+  if (_verbSearch) {
+    const _query = cleanupQuery(_verbSearch[1])
+    if (_query.length > 0) {
+      return makeLocalIntent(
+        { action: 'search_web', query: _query, confidence: 0.8 },
+        _transcript,
+        'search-verb'
+      )
+    }
+  }
+
+  return null
+}
+
+function inferLocalIntentFromTranscript(_transcript: string): LocalInferResult | null {
+  const _clean = cleanupQuery(_transcript)
+  if (_clean.length === 0) {
+    return null
+  }
+
+  return inferLinkIntent(_clean) ?? inferAppIntent(_clean) ?? inferSearchIntent(_clean)
+}
+
+function hasRequiredFields(_intent: VoiceIntent): boolean {
+  switch (_intent.action) {
+    case 'search_web':
+      return Boolean(_intent.query?.trim())
+    case 'open_app':
+    case 'open_app_with_query':
+      return Boolean(_intent.appName?.trim())
+    case 'open_url':
+      return Boolean(_intent.url?.trim())
+    case 'select_link':
+      return _intent.linkIndex !== undefined || Boolean(_intent.linkText?.trim())
+    case 'page_question':
+      return Boolean(_intent.query?.trim()) || Boolean(_intent.anchorText?.trim())
+    case 'spotify_search':
+      return Boolean(_intent.query?.trim())
+    case 'spotify_select':
+      return _intent.targetIndex !== undefined || Boolean(_intent.targetText?.trim())
+    case 'scroll_up':
+    case 'scroll_down':
+    case 'click':
+      return true
+    case 'unknown':
+      return false
+    default:
+      return false
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Vultr Serverless Inference provider (Gemma 4)
 // ---------------------------------------------------------------------------
@@ -255,14 +550,30 @@ export class VultrGemmaIntentProvider implements VoiceIntentProvider {
     const _results = await Promise.all(_checks)
 
     const _best = _results.reduce((_a, _b) => (_b.confidence > _a.confidence ? _b : _a))
+    const _bestCompleteConcreteIntent = _results
+      .filter((_result) => _result.action !== 'unknown' && hasRequiredFields(_result))
+      .reduce<VoiceIntent | null>(
+        (_bestValid, _candidate) =>
+          !_bestValid || _candidate.confidence > _bestValid.confidence ? _candidate : _bestValid,
+        null
+      )
+    const _localFallback = _bestCompleteConcreteIntent
+      ? null
+      : inferLocalIntentFromTranscript(_transcript)
+    const _selected = _bestCompleteConcreteIntent ?? _localFallback?.intent ?? _best
+    const _selectedReason = _bestCompleteConcreteIntent
+      ? 'concrete-with-fields'
+      : _localFallback
+        ? `local-fallback:${_localFallback.tag}`
+        : 'best-overall'
 
     // #region agent log
-    fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b555ed'},body:JSON.stringify({sessionId:'b555ed',runId:'initial',hypothesisId:'H1,H2',location:'src/renderer/src/lib/voiceIntent.ts:parseIntent',message:'Gemma multi-check results',data:{transcriptLength:_transcript.length,segmentCount:_context?.segments.length??0,numChecks:this.m_numChecks,results:_results.map(_r=>({action:_r.action,confidence:_r.confidence})),bestAction:_best.action,bestConfidence:_best.confidence},timestamp:Date.now()})}).catch(()=>{})
+    fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b555ed'},body:JSON.stringify({sessionId:'b555ed',runId:'initial',hypothesisId:'H1,H2',location:'src/renderer/src/lib/voiceIntent.ts:parseIntent',message:'Gemma multi-check results',data:{transcriptLength:_transcript.length,transcriptPrefix:_transcript.slice(0,120),segmentCount:_context?.segments.length??0,numChecks:this.m_numChecks,results:_results.map(_r=>({action:_r.action,confidence:_r.confidence,rawPrefix:_r.raw.slice(0,180),hasQuery:Boolean(_r.query?.trim()),hasAppName:Boolean(_r.appName?.trim()),hasRequiredFields:hasRequiredFields(_r)})),bestAction:_best.action,bestConfidence:_best.confidence,selectedAction:_selected.action,selectedConfidence:_selected.confidence,selectedReason:_selectedReason},timestamp:Date.now()})}).catch(()=>{})
     // #endregion
     // #region agent log
-    fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'75ef5f'},body:JSON.stringify({sessionId:'75ef5f',runId:'initial',hypothesisId:'H1',location:'src/renderer/src/lib/voiceIntent.ts:parseIntent',message:'Gemma intent normalized',data:{transcriptLength:_transcript.length,contentPrefix:_best.raw.slice(0,180),normalizedAction:_best.action,hasLinkIndex:_best.linkIndex!==undefined,hasLinkText:Boolean(_best.linkText?.trim()),hasTargetIndex:_best.targetIndex!==undefined,hasTargetText:Boolean(_best.targetText?.trim()),targetKind:_best.targetKind,confidence:_best.confidence},timestamp:Date.now()})}).catch(()=>{})
+    fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'75ef5f'},body:JSON.stringify({sessionId:'75ef5f',runId:'initial',hypothesisId:'H1',location:'src/renderer/src/lib/voiceIntent.ts:parseIntent',message:'Gemma intent normalized',data:{transcriptLength:_transcript.length,contentPrefix:_selected.raw.slice(0,180),normalizedAction:_selected.action,hasLinkIndex:_selected.linkIndex!==undefined,hasLinkText:Boolean(_selected.linkText?.trim()),hasTargetIndex:_selected.targetIndex!==undefined,hasTargetText:Boolean(_selected.targetText?.trim()),targetKind:_selected.targetKind,confidence:_selected.confidence,selectedReason:_selectedReason},timestamp:Date.now()})}).catch(()=>{})
     // #endregion
 
-    return _best
+    return _selected
   }
 }
