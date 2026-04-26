@@ -21,10 +21,6 @@ function deltaScale(distFromCenter: number): number {
   return 0.7 + t * 0.6
 }
 
-function tipDist(lm: Landmark[]): number {
-  return Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y)
-}
-
 export function useGestureControl(): {
   processFrame: (landmarks: Landmark[], gesture: GestureName, leftHandGesture: GestureName) => void
   isPrecisionMode: boolean

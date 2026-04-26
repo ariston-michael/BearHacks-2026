@@ -17,16 +17,25 @@ const CARDS: GestureCard[] = [
     hand: 'Right hand',
     action: 'Move cursor',
     description:
-      'Hold your right palm open and move your hand to control the OS cursor. Switch to left hand open palm to enter Precision Mode (0.4× speed).',
+      'Hold your right palm open and move your hand to control the OS cursor. Switch to left hand open palm to enter Precision Mode (0.4× speed) for fine pixel-level control.',
   },
   {
-    pose: 'pinch',
-    color: '#f472b6',
-    name: 'Pinch',
+    pose: 'devil-horns',
+    color: '#f43f5e',
+    name: 'Devil Horns',
     hand: 'Right hand',
-    action: 'Click & Drag',
+    action: 'Click',
     description:
-      'Bring your right thumb and index finger together to press and hold the left mouse button. Move while pinched to drag. Release fingers to drop.',
+      'Extend your right index finger and pinky while curling the middle and ring fingers. Each time you form the gesture the left mouse button fires — release and re-form to click again.',
+  },
+  {
+    pose: 'point',
+    color: '#facc15',
+    name: 'Point',
+    hand: 'Right hand',
+    action: 'Precision cursor',
+    description:
+      'Extend only your right index finger with all other fingers curled. Activates Precision Mode for fine-grained cursor control at reduced speed.',
   },
   {
     pose: 'v-shape',
@@ -35,7 +44,7 @@ const CARDS: GestureCard[] = [
     hand: 'Left hand',
     action: 'Scroll page',
     description:
-      'Make a V-sign with your left hand. Hold the pose, then tilt up to scroll up or down to scroll down. Speed scales with how far you move past the deadzone.',
+      'Make a V-sign (peace sign) with your left hand. Tilt up to scroll up or down to scroll down. Speed scales with how far you move past the deadzone.',
   },
   {
     pose: 'fist',
@@ -45,6 +54,69 @@ const CARDS: GestureCard[] = [
     action: 'Orbit 3D camera',
     description:
       'Close your left fist (or give a thumbs-up) and move your hand to orbit the 3D camera in Blender, Three.js, or any app that uses Middle Mouse Button rotation.',
+  },
+  {
+    pose: 'open-palm',
+    color: '#34d399',
+    name: 'Open Palm',
+    hand: 'Left hand',
+    action: 'Precision Mode',
+    description:
+      'Hold your left palm open while moving the right hand to activate Precision Mode — right-hand cursor speed drops to 0.4× for pixel-perfect positioning.',
+  },
+]
+
+interface VoiceCommand {
+  phrase: string
+  action: string
+  example: string
+}
+
+const VOICE_COMMANDS: VoiceCommand[] = [
+  {
+    phrase: 'Open app',
+    action: 'Launch or focus an application',
+    example: '"Open Spotify" · "Open Chrome" · "Open terminal"',
+  },
+  {
+    phrase: 'Open URL',
+    action: 'Navigate to a website',
+    example: '"Open github.com" · "Open youtube.com"',
+  },
+  {
+    phrase: 'Search for…',
+    action: 'Web search in default browser',
+    example: '"Search for TypeScript tutorials" · "Search React hooks"',
+  },
+  {
+    phrase: 'Open … with query',
+    action: 'Launch app with a search query',
+    example: '"Open YouTube with lofi music"',
+  },
+  {
+    phrase: 'Select link / Click link',
+    action: 'Click a link or button on screen by name',
+    example: '"Select Sign In" · "Click Download"',
+  },
+  {
+    phrase: 'What does … mean / Summarise',
+    action: 'Answer a question about the current page',
+    example: '"What does this page say about pricing?"',
+  },
+  {
+    phrase: 'Play … on Spotify',
+    action: 'Search Spotify for a track or artist',
+    example: '"Play Daft Punk on Spotify"',
+  },
+  {
+    phrase: 'Scroll up / Scroll down',
+    action: 'Scroll the current window',
+    example: '"Scroll down" · "Scroll to the top"',
+  },
+  {
+    phrase: 'Click',
+    action: 'Left-click at the current cursor position',
+    example: '"Click" · "Click here"',
   },
 ]
 
@@ -58,8 +130,8 @@ export default function TutorialPage(): React.JSX.Element {
         </p>
         <h1 className="mt-1 text-2xl font-semibold text-white">Gesture Guide</h1>
         <p className="mt-1 text-sm text-white/50">
-          Learn each hand gesture and what it controls at the OS level. The skeleton preview below
-          each card rotates so you can see the pose from every angle.
+          Learn each hand gesture and voice command. The skeleton preview rotates so you can see the
+          pose from every angle.
         </p>
       </div>
 
@@ -79,10 +151,10 @@ export default function TutorialPage(): React.JSX.Element {
       </div>
 
       {/* Gesture card grid */}
-      <div className="grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2">
-        {CARDS.map((card) => (
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {CARDS.map((card, idx) => (
           <div
-            key={card.pose}
+            key={`${card.pose}-${idx}`}
             className="flex flex-col overflow-hidden rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)] transition-shadow hover:shadow-xl hover:border-white/20"
           >
             {/* 3D hand preview */}
@@ -93,10 +165,7 @@ export default function TutorialPage(): React.JSX.Element {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h2 className="text-base font-semibold text-white">{card.name}</h2>
-                  <p
-                    className="text-xs font-medium"
-                    style={{ color: card.color }}
-                  >
+                  <p className="text-xs font-medium" style={{ color: card.color }}>
                     {card.action}
                   </p>
                 </div>
@@ -116,6 +185,39 @@ export default function TutorialPage(): React.JSX.Element {
         ))}
       </div>
 
+      {/* Voice Commands section */}
+      <div className="mt-2">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-white">Voice Commands</h2>
+          <p className="mt-1 text-sm text-white/50">
+            Say{' '}
+            <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 font-mono text-xs text-indigo-300">
+              Hey Air Control
+            </span>{' '}
+            to activate the microphone, then speak one of the commands below.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {VOICE_COMMANDS.map((cmd) => (
+            <div
+              key={cmd.phrase}
+              className="flex flex-col gap-1 rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)] sm:flex-row sm:items-start sm:gap-4"
+            >
+              <div className="shrink-0 sm:w-44">
+                <span className="rounded-full bg-violet-500/15 px-2.5 py-1 text-xs font-semibold text-violet-300 ring-1 ring-violet-500/30">
+                  {cmd.phrase}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <p className="text-sm font-medium text-white/80">{cmd.action}</p>
+                <p className="text-xs text-white/40 italic">{cmd.example}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Footer tip */}
       <p className="shrink-0 text-center text-xs text-white/30">
         Tip: Use the <span className="text-white/50">Dashboard</span> to see your live gesture
@@ -124,4 +226,3 @@ export default function TutorialPage(): React.JSX.Element {
     </div>
   )
 }
-

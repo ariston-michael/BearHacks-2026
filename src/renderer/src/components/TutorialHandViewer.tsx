@@ -16,7 +16,7 @@ const CONNECTIONS: [number, number][] = [
 ]
 
 // Each pose is an array of 21 [x, y] coords in SVG-space (0–200 × 0–220).
-export type GesturePose = 'open-palm' | 'pinch' | 'v-shape' | 'fist'
+export type GesturePose = 'open-palm' | 'pinch' | 'v-shape' | 'fist' | 'devil-horns' | 'point'
 
 const POSES: Record<GesturePose, [number, number][]> = {
   'open-palm': [
@@ -110,6 +110,52 @@ const POSES: Record<GesturePose, [number, number][]> = {
     [128, 113], // 18 — curled
     [128, 107], // 19
     [126, 103], // 20 pinky TIP
+  ],
+  'devil-horns': [
+    [100, 170], // 0 wrist
+    [80, 150],  // 1 thumb CMC
+    [66, 132],  // 2 thumb MCP
+    [58, 118],  // 3 thumb IP
+    [54, 106],  // 4 thumb TIP (extended out to side)
+    [84, 124],  // 5 index MCP
+    [82, 96],   // 6 index PIP
+    [80, 72],   // 7 index DIP
+    [78, 50],   // 8 index TIP (extended up)
+    [100, 120], // 9 middle MCP
+    [99, 106],  // 10 middle PIP — curled
+    [101, 98],  // 11
+    [106, 94],  // 12 middle TIP (curled)
+    [115, 122], // 13 ring MCP
+    [116, 108], // 14 ring PIP — curled
+    [115, 100], // 15
+    [113, 96],  // 16 ring TIP (curled)
+    [128, 128], // 17 pinky MCP
+    [132, 106], // 18 pinky PIP
+    [134, 84],  // 19 pinky DIP
+    [135, 64],  // 20 pinky TIP (extended up)
+  ],
+  'point': [
+    [100, 170], // 0 wrist
+    [80, 150],  // 1 thumb CMC
+    [68, 132],  // 2 thumb MCP
+    [62, 118],  // 3 thumb IP
+    [68, 108],  // 4 thumb TIP (tucked toward palm)
+    [84, 124],  // 5 index MCP
+    [82, 96],   // 6 index PIP
+    [80, 72],   // 7 index DIP
+    [79, 50],   // 8 index TIP (fully extended)
+    [100, 120], // 9 middle MCP
+    [100, 106], // 10 middle PIP — curled
+    [102, 98],  // 11
+    [107, 94],  // 12 middle TIP (curled)
+    [115, 122], // 13 ring MCP
+    [116, 108], // 14 ring PIP — curled
+    [115, 100], // 15
+    [113, 97],  // 16 ring TIP (curled)
+    [127, 128], // 17 pinky MCP
+    [130, 116], // 18 pinky PIP — curled
+    [130, 109], // 19
+    [128, 105], // 20 pinky TIP (curled)
   ],
 }
 

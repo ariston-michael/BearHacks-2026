@@ -34,7 +34,7 @@ export default function ModelViewer(): React.JSX.Element {
   }, [rotationDeltaX, rotationDeltaY])
 
   return (
-    <section className="relative rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)]">
+    <section className="relative rounded-xl border border-white/10 bg-white/5 p-4">
       <span className="text-sm text-white/50">3D Model</span>
 
       {/* Status badges — top-right, only visible when active */}
