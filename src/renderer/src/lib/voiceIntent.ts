@@ -221,7 +221,7 @@ export class VultrGemmaIntentProvider implements VoiceIntentProvider {
             { role: 'system', content: INTENT_SYSTEM_PROMPT },
             { role: 'user', content: _userContent }
           ],
-          max_tokens: 256,
+          max_tokens: 128,
           temperature: 0.1
         })
       })
