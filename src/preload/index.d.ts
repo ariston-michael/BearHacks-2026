@@ -27,7 +27,6 @@ interface DisplayAPI {
   getActiveMetrics: () => Promise<{ width: number; height: number; scaleFactor: number }>
 }
 
-
 interface VoiceApi {
   executeIntent: (_payload: VoiceExecuteIntentPayload) => Promise<VoiceExecuteIntentResult>
 }
@@ -41,7 +40,6 @@ type AppElectronAPI = ElectronAPI & {
   keyboard: KeyboardAPI
   settings: SettingsAPI
   display: DisplayAPI
-
 }
 
 declare global {

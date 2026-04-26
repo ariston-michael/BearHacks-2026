@@ -35,7 +35,6 @@ const electronAPI = {
     getActiveMetrics: (): Promise<{ width: number; height: number; scaleFactor: number }> =>
       ipcRenderer.invoke('display:getActiveMetrics')
   },
-
   process: {
     platform: process.platform,
     versions: process.versions

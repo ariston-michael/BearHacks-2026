@@ -4,6 +4,8 @@ import { Vector2Smoother } from '../lib/smoothing'
 import { useSettingsStore } from '../stores/settingsStore'
 import type { CalibrationBounds } from '../stores/settingsStore'
 
+const ACTIVE_MIN = 0.15
+const ACTIVE_RANGE = 0.70
 const DEAD_ZONE_PX = 4
 const SMOOTHING = 0.3
 
@@ -95,9 +97,8 @@ export function useGestureControl(): {
           activeX = clamp((screenX - calib.minX) / rangeX, 0, 1)
           activeY = clamp((tip.y - calib.minY) / rangeY, 0, 1)
         } else {
-          // Direct boundary mapping: camera normalized corners -> screen corners.
-          activeX = clamp(1 - tip.x, 0, 1)
-          activeY = clamp(tip.y, 0, 1)
+          activeX = clamp((1 - tip.x - ACTIVE_MIN) / ACTIVE_RANGE, 0, 1)
+          activeY = clamp((tip.y - ACTIVE_MIN) / ACTIVE_RANGE, 0, 1)
         }
         const rawX = activeX * (W - 1)
         const rawY = activeY * (H - 1)
