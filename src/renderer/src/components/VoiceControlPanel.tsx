@@ -1,9 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { ElevenLabsScribeTranscriber } from '../lib/elevenLabsTranscriber'
+import { ElevenLabsTtsService } from '../lib/elevenLabsTts'
 import type { SpeechTranscriber } from '../lib/speechRecognition'
 import { dispatchVoiceIntent } from '../lib/voiceActionDispatcher'
 import { VultrGemmaIntentProvider, type VoiceIntentProvider } from '../lib/voiceIntent'
 import { useVoiceStore } from '../stores/voiceStore'
+import { useVoiceSettingsStore } from '../stores/voiceSettingsStore'
+import type { VoiceIntent } from '../stores/voiceStore'
 
 const ELEVENLABS_API_KEY = import.meta.env.RENDERER_VITE_ELEVENLABS_API_KEY ?? ''
 const VULTR_API_KEY = import.meta.env.RENDERER_VITE_VULTR_INFERENCE_KEY ?? ''
@@ -11,6 +14,50 @@ const VULTR_API_KEY = import.meta.env.RENDERER_VITE_VULTR_INFERENCE_KEY ?? ''
 const m_intentProvider: VoiceIntentProvider | null = VULTR_API_KEY
   ? new VultrGemmaIntentProvider(VULTR_API_KEY)
   : null
+
+const m_tts = new ElevenLabsTtsService()
+
+function buildAckPhrase(_intent: VoiceIntent): string {
+  switch (_intent.action) {
+    case 'search_web':
+      return `Searching for ${_intent.query ?? 'that'}`
+    case 'open_app':
+      return `Opening ${_intent.appName ?? 'that'}`
+    case 'scroll_up':
+      return 'Scrolling up'
+    case 'scroll_down':
+      return 'Scrolling down'
+    case 'click':
+      return 'Done'
+    default:
+      return ''
+  }
+}
+
+function SpeakerIcon({ _muted }: { _muted: boolean }): React.JSX.Element {
+  if (_muted) {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-4 w-4"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        <path d="M13 4.07V3a1 1 0 0 0-1.707-.707l-4 4H4a1 1 0 0 0-1 1v5.414a1 1 0 0 0 1 1h.586l1.5 1.5A1 1 0 0 0 8 15v-1.586l2.293 2.293A1 1 0 0 0 12 15v-1.07A5.002 5.002 0 0 0 13 4.07zM3.707 2.293a1 1 0 0 0-1.414 1.414l18 18a1 1 0 0 0 1.414-1.414l-18-18z" />
+      </svg>
+    )
+  }
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
+      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+    </svg>
+  )
+}
 
 export default function VoiceControlPanel(): React.JSX.Element {
   const _transcriberRef = useRef<SpeechTranscriber | null>(null)
@@ -32,6 +79,16 @@ export default function VoiceControlPanel(): React.JSX.Element {
   const _appendTranscript = useVoiceStore((_state) => _state.appendTranscript)
   const _clearVoiceState = useVoiceStore((_state) => _state.clearVoiceState)
 
+  const _acknowledgementsEnabled = useVoiceSettingsStore((_s) => _s.acknowledgementsEnabled)
+  const _setAcknowledgementsEnabled = useVoiceSettingsStore((_s) => _s.setAcknowledgementsEnabled)
+  const _voiceId = useVoiceSettingsStore((_s) => _s.voiceId)
+  const _modelId = useVoiceSettingsStore((_s) => _s.modelId)
+  const _stability = useVoiceSettingsStore((_s) => _s.stability)
+  const _similarityBoost = useVoiceSettingsStore((_s) => _s.similarityBoost)
+  const _style = useVoiceSettingsStore((_s) => _s.style)
+  const _useSpeakerBoost = useVoiceSettingsStore((_s) => _s.useSpeakerBoost)
+  const _speed = useVoiceSettingsStore((_s) => _s.speed)
+
   const _hasElevenLabsKey = ELEVENLABS_API_KEY.length > 0
   const _hasVultrKey = VULTR_API_KEY.length > 0
 
@@ -39,8 +96,35 @@ export default function VoiceControlPanel(): React.JSX.Element {
     return () => {
       _transcriberRef.current?.stop()
       _transcriberRef.current = null
+      m_tts.cancel()
     }
   }, [])
+
+  const _speakAck = (_intent: VoiceIntent): void => {
+    if (!_acknowledgementsEnabled || !_hasElevenLabsKey) {
+      return
+    }
+    const _phrase = buildAckPhrase(_intent)
+    if (!_phrase) {
+      return
+    }
+    void m_tts
+      .speak(_phrase, {
+        apiKey: ELEVENLABS_API_KEY,
+        voiceId: _voiceId,
+        modelId: _modelId,
+        voiceSettings: {
+          stability: _stability,
+          similarityBoost: _similarityBoost,
+          style: _style,
+          useSpeakerBoost: _useSpeakerBoost,
+          speed: _speed
+        }
+      })
+      .catch((_err) => {
+        console.warn('[VoiceControlPanel] TTS acknowledgement failed:', _err)
+      })
+  }
 
   const _startListening = async (): Promise<void> => {
     if (!_hasElevenLabsKey) {
@@ -83,6 +167,9 @@ export default function VoiceControlPanel(): React.JSX.Element {
               _setLastIntent(_intent)
               const _actionResult = await dispatchVoiceIntent(_intent)
               _setLastActionResult(_actionResult)
+              if (_actionResult.ok) {
+                _speakAck(_intent)
+              }
             } catch (_intentError) {
               const _message =
                 _intentError instanceof Error ? _intentError.message : 'intent-parse-failed'
@@ -132,11 +219,24 @@ export default function VoiceControlPanel(): React.JSX.Element {
             (search, open app, scroll). Speak a phrase, pause, and results appear below.
           </p>
         </div>
-        {_isRecording && (
-          <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-300">
-            Recording...
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {_isRecording && (
+            <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-300">
+              Recording...
+            </span>
+          )}
+          <button
+            onClick={() => _setAcknowledgementsEnabled(!_acknowledgementsEnabled)}
+            title={_acknowledgementsEnabled ? 'Mute voice acknowledgements' : 'Unmute voice acknowledgements'}
+            className={`rounded-lg p-2 transition-colors ${
+              _acknowledgementsEnabled
+                ? 'text-accent hover:bg-white/10'
+                : 'text-white/30 hover:bg-white/10 hover:text-white/60'
+            }`}
+          >
+            <SpeakerIcon _muted={!_acknowledgementsEnabled} />
+          </button>
+        </div>
       </div>
 
       {!_hasElevenLabsKey && (

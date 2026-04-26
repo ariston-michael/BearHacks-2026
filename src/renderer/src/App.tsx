@@ -3,11 +3,13 @@ import DashboardPage from './pages/DashboardPage'
 import CalibrationPage from './pages/CalibrationPage'
 import SettingsPage from './pages/SettingsPage'
 import TutorialPage from './pages/TutorialPage'
+import VoiceSettingsPage from './pages/VoiceSettingsPage'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard' },
   { to: '/calibration', label: 'Calibration' },
   { to: '/settings', label: 'Settings' },
+  { to: '/voice', label: 'Voice' },
   { to: '/tutorial', label: 'Tutorial' }
 ]
 
@@ -43,6 +45,7 @@ function App(): React.JSX.Element {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/calibration" element={<CalibrationPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/voice" element={<VoiceSettingsPage />} />
             <Route path="/tutorial" element={<TutorialPage />} />
           </Routes>
         </main>
