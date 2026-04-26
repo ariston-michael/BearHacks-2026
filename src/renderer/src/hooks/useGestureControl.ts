@@ -8,7 +8,6 @@ const ACTIVE_MIN = 0.15
 const ACTIVE_RANGE = 0.70
 const DEAD_ZONE_PX = 4
 const SMOOTHING = 0.3
-
 const DEVIL_HORNS_COOLDOWN_MS = 120
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -29,6 +28,7 @@ function tipDist(lm: Landmark[]): number {
 export function useGestureControl(): {
   processFrame: (landmarks: Landmark[], gesture: GestureName, leftHandGesture: GestureName) => void
   isPrecisionMode: boolean
+  isDragMode: boolean
 } {
   const smoother = useRef(new Vector2Smoother(SMOOTHING))
   const clickHeld = useRef(false)
@@ -36,6 +36,7 @@ export function useGestureControl(): {
   const lastPos = useRef({ x: -1, y: -1 })
   const [isPrecisionMode, setIsPrecisionMode] = useState(false)
   const precisionRef = useRef(false)
+  const [isDragMode] = useState(false)
   const displaySizeRef = useRef({
     width: Math.max(1, Math.round(window.screen.width * (window.devicePixelRatio || 1))),
     height: Math.max(1, Math.round(window.screen.height * (window.devicePixelRatio || 1)))
@@ -67,7 +68,12 @@ export function useGestureControl(): {
       void refreshDisplayMetrics()
     }, 2000)
 
-    return () => window.clearInterval(id)
+    return () => {
+      window.clearInterval(id)
+      if (clickHeld.current) {
+        window.electron.cursor.mouseUp()
+      }
+    }
   }, [])
 
   const processFrame = useCallback(
@@ -157,5 +163,5 @@ export function useGestureControl(): {
     [] // setIsPrecisionMode is stable; no other captured deps
   )
 
-  return { processFrame, isPrecisionMode }
+  return { processFrame, isPrecisionMode, isDragMode }
 }

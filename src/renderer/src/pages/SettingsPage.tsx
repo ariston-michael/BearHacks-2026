@@ -95,8 +95,6 @@ export default function SettingsPage(): React.JSX.Element {
   const [cameras, setCameras] = useState<MediaDevice[]>([])
   const [audios, setAudios] = useState<MediaDevice[]>([])
   const [mediaLoading, setMediaLoading] = useState(true)
-  const [isPaused, setIsPaused] = useState(false)
-  const [clickDelay, setClickDelay] = useState(100) // visual only; engine uses hardcoded hysteresis
 
   // ── Load startup setting from main process ─────────────────────────────────
   useEffect(() => {
@@ -154,15 +152,9 @@ export default function SettingsPage(): React.JSX.Element {
     <div className="h-full overflow-y-auto bg-zinc-950 text-white">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-sm border-b border-zinc-800/60 px-8 py-5">
-        <div className="flex items-center justify-between max-w-2xl">
-          <div>
-            <p className="text-xs font-medium text-white/40 mb-0.5">AirControl › Settings</p>
-            <h1 className="text-xl font-semibold text-white tracking-tight">Settings</h1>
-          </div>
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-300 ${isPaused ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isPaused ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
-            {isPaused ? 'Paused' : 'Active'}
-          </div>
+        <div className="max-w-2xl">
+          <p className="text-xs font-medium text-white/40 mb-0.5">AirControl › Settings</p>
+          <h1 className="text-xl font-semibold text-white tracking-tight">Settings</h1>
         </div>
       </div>
 
@@ -199,24 +191,6 @@ export default function SettingsPage(): React.JSX.Element {
             />
           </SettingsCard>
 
-          <SettingsCard>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm text-zinc-300 font-medium">Click Confirmation Hold</span>
-              <span className="text-[11px] text-zinc-600 font-mono">default 100ms</span>
-            </div>
-            <p className="text-[11px] text-zinc-600 mb-1">How long to hold pinch before a click fires. Higher = fewer accidental clicks.</p>
-            <StyledSlider
-              value={clickDelay} min={0} max={500} step={10}
-              onChange={setClickDelay}
-              formatValue={(v) => `${v}ms`}
-              leftLabel="0ms Instant" rightLabel="500ms Deliberate"
-            />
-            {clickDelay === 0 && (
-              <p className="mt-3 text-[11px] text-amber-400/80 flex items-center gap-1.5">
-                <span>⚠</span> Instant clicks may fire accidentally.
-              </p>
-            )}
-          </SettingsCard>
         </section>
 
         {/* ── 2. Media Devices ── */}
@@ -314,28 +288,6 @@ export default function SettingsPage(): React.JSX.Element {
             </div>
           </SettingsCard>
 
-          <SettingsCard>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-zinc-300 font-medium">Gesture Detection</p>
-                <p className="text-[11px] text-zinc-600 mt-0.5">
-                  Temporarily pause gesture recognition. Also toggleable via{' '}
-                  <kbd className="px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 text-[10px] font-mono">F9</kbd>
-                </p>
-              </div>
-              <button
-                onClick={() => setIsPaused((p) => !p)}
-                className={`relative flex items-center w-12 h-6 rounded-full border transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${isPaused ? 'bg-zinc-800 border-zinc-700' : 'bg-indigo-600 border-indigo-500'}`}
-                role="switch" aria-checked={!isPaused}
-              >
-                <span className={`absolute w-4 h-4 rounded-full bg-white shadow transition-all duration-300 ${isPaused ? 'left-1' : 'left-7'}`} />
-              </button>
-            </div>
-            <div className={`mt-4 flex items-center gap-2 text-xs transition-all duration-300 ${isPaused ? 'text-amber-400' : 'text-emerald-400'}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isPaused ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
-              {isPaused ? 'Detection paused — gestures will not trigger actions' : 'Detection active — gestures are being processed'}
-            </div>
-          </SettingsCard>
         </section>
 
         <div className="h-6" />
