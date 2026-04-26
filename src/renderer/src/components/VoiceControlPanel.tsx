@@ -64,7 +64,6 @@ export default function VoiceControlPanel(): React.JSX.Element {
   const _ttsRef = useRef<ElevenLabsTtsService | null>(null)
   // Holds the latest _startListening so startWakeWord can call it without a stale closure
   const _startListeningFnRef = useRef<() => Promise<void>>(async () => {})
-  const _ttsRef = useRef<ElevenLabsTtsService | null>(null)
   const [_isWakeWordMode, _setIsWakeWordMode] = useState(true)
 
   function getTts(): ElevenLabsTtsService {

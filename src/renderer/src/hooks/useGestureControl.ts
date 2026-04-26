@@ -40,16 +40,44 @@ export function useGestureControl(): {
   const lastPos = useRef({ x: -1, y: -1 })
   const [isPrecisionMode, setIsPrecisionMode] = useState(false)
   const precisionRef = useRef(false)
+  const displaySizeRef = useRef({
+    width: Math.max(1, Math.round(window.screen.width * (window.devicePixelRatio || 1))),
+    height: Math.max(1, Math.round(window.screen.height * (window.devicePixelRatio || 1)))
+  })
 
   // Keep calibration bounds in a ref so the stable processFrame callback always reads the latest value.
   const calibBoundsRef = useRef<CalibrationBounds | null>(null)
   const calibrationBounds = useSettingsStore((s) => s.calibrationBounds)
   useEffect(() => { calibBoundsRef.current = calibrationBounds }, [calibrationBounds])
 
+  useEffect(() => {
+    const refreshDisplayMetrics = async (): Promise<void> => {
+      try {
+        const metrics = await window.electron.display.getActiveMetrics()
+        displaySizeRef.current = {
+          width: Math.max(1, Math.round(metrics.width * metrics.scaleFactor)),
+          height: Math.max(1, Math.round(metrics.height * metrics.scaleFactor))
+        }
+      } catch {
+        displaySizeRef.current = {
+          width: Math.max(1, Math.round(window.screen.width * (window.devicePixelRatio || 1))),
+          height: Math.max(1, Math.round(window.screen.height * (window.devicePixelRatio || 1)))
+        }
+      }
+    }
+
+    void refreshDisplayMetrics()
+    const id = window.setInterval(() => {
+      void refreshDisplayMetrics()
+    }, 2000)
+
+    return () => window.clearInterval(id)
+  }, [])
+
   const processFrame = useCallback(
     (landmarks: Landmark[], gesture: GestureName, leftHandGesture: GestureName): void => {
-      const W = window.screen.width
-      const H = window.screen.height
+      const W = displaySizeRef.current.width
+      const H = displaySizeRef.current.height
 
       // Update precision mode UI only on transitions.
       const precision = leftHandGesture === 'open-palm'
@@ -68,14 +96,16 @@ export function useGestureControl(): {
         if (calib) {
           // Use calibrated bounds: screenX = 1 - tip.x (mirrored), same as how bounds were captured.
           const screenX = 1 - tip.x
-          activeX = clamp((screenX - calib.minX) / (calib.maxX - calib.minX), 0, 1)
-          activeY = clamp((tip.y - calib.minY) / (calib.maxY - calib.minY), 0, 1)
+          const rangeX = Math.max(0.01, calib.maxX - calib.minX)
+          const rangeY = Math.max(0.01, calib.maxY - calib.minY)
+          activeX = clamp((screenX - calib.minX) / rangeX, 0, 1)
+          activeY = clamp((tip.y - calib.minY) / rangeY, 0, 1)
         } else {
           activeX = clamp((1 - tip.x - ACTIVE_MIN) / ACTIVE_RANGE, 0, 1)
           activeY = clamp((tip.y - ACTIVE_MIN) / ACTIVE_RANGE, 0, 1)
         }
-        const rawX = activeX * W
-        const rawY = activeY * H
+        const rawX = activeX * (W - 1)
+        const rawY = activeY * (H - 1)
 
         const distFromCenter = Math.hypot(activeX - 0.5, activeY - 0.5)
         const accel = deltaScale(distFromCenter)
