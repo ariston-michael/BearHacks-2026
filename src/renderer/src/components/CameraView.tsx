@@ -4,6 +4,7 @@ import { Camera } from '@mediapipe/camera_utils'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils'
 import { classifyGesture, GestureStabilizer } from '../lib/gestureClassifier'
 import { useGestureControl } from '../hooks/useGestureControl'
+import { useLeftHandControl } from '../hooks/useLeftHandControl'
 import { GestureName } from '../types'
 
 const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240'
@@ -17,6 +18,7 @@ export default function CameraView(): React.JSX.Element {
   const leftStabilizerRef = useRef(new GestureStabilizer(3))
   const rightStabilizerRef = useRef(new GestureStabilizer(3))
   const { processFrame, isPrecisionMode } = useGestureControl()
+  const { processLeftFrame } = useLeftHandControl()
 
   const [error, setError] = useState<string | null>(null)
   const [handCount, setHandCount] = useState(0)
@@ -61,7 +63,11 @@ export default function CameraView(): React.JSX.Element {
         return { lm, gesture: stabilizer.update(raw), displaySide, side }
       })
 
-      const leftGesture = classified.find((h) => h.side === 'left')?.gesture ?? 'none'
+      const leftHand = classified.find((h) => h.side === 'left')
+      const leftGesture = leftHand?.gesture ?? 'none'
+
+      // Dispatch left-hand controls (scroll + 3D rotation).
+      processLeftFrame(leftHand?.lm ?? null, leftGesture)
 
       // Phase 2: draw landmarks + labels, then dispatch cursor control.
       for (const { lm, gesture, displaySide, side } of classified) {

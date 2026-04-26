@@ -16,8 +16,6 @@ const m_intentProvider: VoiceIntentProvider | null = VULTR_API_KEY
   ? new VultrGemmaIntentProvider(VULTR_API_KEY)
   : null
 
-const m_tts = new ElevenLabsTtsService()
-
 function buildAckPhrase(_intent: VoiceIntent): string {
   switch (_intent.action) {
     case 'search_web':
@@ -63,7 +61,13 @@ function SpeakerIcon({ _muted }: { _muted: boolean }): React.JSX.Element {
 export default function VoiceControlPanel(): React.JSX.Element {
   const _transcriberRef = useRef<SpeechTranscriber | null>(null)
   const _wakeWordRef = useRef<WakeWordDetector | null>(null)
+  const _ttsRef = useRef<ElevenLabsTtsService | null>(null)
   const [_isWakeWordMode, _setIsWakeWordMode] = useState(false)
+
+  function getTts(): ElevenLabsTtsService {
+    if (!_ttsRef.current) _ttsRef.current = new ElevenLabsTtsService()
+    return _ttsRef.current
+  }
 
   const _isListening = useVoiceStore((_state) => _state.isListening)
   const _isRecording = useVoiceStore((_state) => _state.isRecording)
@@ -124,7 +128,7 @@ export default function VoiceControlPanel(): React.JSX.Element {
     if (!_phrase) {
       return
     }
-    void m_tts
+    void getTts()
       .speak(_phrase, {
         apiKey: ELEVENLABS_API_KEY,
         voiceId: _voiceId,
@@ -246,13 +250,12 @@ export default function VoiceControlPanel(): React.JSX.Element {
   }
 
   useEffect(() => {
-    startWakeWord()
     return () => {
       _wakeWordRef.current?.stop()
       _wakeWordRef.current = null
       _transcriberRef.current?.stop()
       _transcriberRef.current = null
-      m_tts.cancel()
+      _ttsRef.current?.cancel()
     }
   }, [])
 
@@ -316,6 +319,17 @@ export default function VoiceControlPanel(): React.JSX.Element {
       )}
 
       <div className="mt-4 flex gap-2">
+        <button
+          className={`rounded px-3 py-2 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            _isWakeWordMode
+              ? 'bg-blue-600 hover:bg-blue-700'
+              : 'bg-accent hover:opacity-90'
+          }`}
+          onClick={_isWakeWordMode ? _onStop : startWakeWord}
+          disabled={_isListening}
+        >
+          {_isWakeWordMode ? 'Stop Voice Assistant' : 'Start Voice Assistant'}
+        </button>
         <button
           className="rounded bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           onClick={_onStartListening}
