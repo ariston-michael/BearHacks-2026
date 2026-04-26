@@ -54,7 +54,7 @@ export default function TutorialPage(): React.JSX.Element {
       {/* Page header */}
       <div>
         <p className="text-xs font-medium uppercase tracking-widest text-white/40">
-          AirFlow &rsaquo; Tutorial
+          AirControl &rsaquo; Tutorial
         </p>
         <h1 className="mt-1 text-2xl font-semibold text-white">Gesture Guide</h1>
         <p className="mt-1 text-sm text-white/50">

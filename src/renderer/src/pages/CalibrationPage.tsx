@@ -148,7 +148,7 @@ export default function CalibrationPage(): React.JSX.Element {
     <div className="flex flex-col gap-6 h-full">
       {/* Header */}
       <div>
-        <p className="text-xs font-medium text-white/40 mb-1">AirFlow › Calibration</p>
+        <p className="text-xs font-medium text-white/40 mb-1">AirControl › Calibration</p>
         <h1 className="text-2xl font-bold text-white">Gesture Calibration</h1>
         <p className="mt-1 text-sm text-white/50">
           Map your comfortable hand range to the full screen so the cursor reaches every corner without strain.

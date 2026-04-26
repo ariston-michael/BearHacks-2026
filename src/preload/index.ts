@@ -31,6 +31,11 @@ const electronAPI = {
     getApiKey: (service: string): Promise<string> => ipcRenderer.invoke('settings:getApiKey', service),
     setApiKey: (service: string, key: string): Promise<void> => ipcRenderer.invoke('settings:setApiKey', service, key),
   },
+  display: {
+    getActiveMetrics: (): Promise<{ width: number; height: number; scaleFactor: number }> =>
+      ipcRenderer.invoke('display:getActiveMetrics')
+  },
+
   process: {
     platform: process.platform,
     versions: process.versions

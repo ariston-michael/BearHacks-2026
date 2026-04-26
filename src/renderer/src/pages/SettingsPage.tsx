@@ -156,7 +156,7 @@ export default function SettingsPage(): React.JSX.Element {
       <div className="sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-sm border-b border-zinc-800/60 px-8 py-5">
         <div className="flex items-center justify-between max-w-2xl">
           <div>
-            <p className="text-xs font-medium text-white/40 mb-0.5">AirFlow › Settings</p>
+            <p className="text-xs font-medium text-white/40 mb-0.5">AirControl › Settings</p>
             <h1 className="text-xl font-semibold text-white tracking-tight">Settings</h1>
           </div>
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-300 ${isPaused ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'}`}>
@@ -302,7 +302,7 @@ export default function SettingsPage(): React.JSX.Element {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-zinc-300 font-medium">Launch on System Startup</p>
-                <p className="text-[11px] text-zinc-600 mt-0.5">AirFlow will start automatically when you log in.</p>
+                <p className="text-[11px] text-zinc-600 mt-0.5">AirControl will start automatically when you log in.</p>
               </div>
               <button
                 onClick={handleStartupToggle}
