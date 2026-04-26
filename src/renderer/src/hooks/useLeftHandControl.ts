@@ -5,22 +5,37 @@ import { useLeftHandStore } from '../stores/leftHandStore'
 // Normalized-coordinate displacement from anchor before scroll fires.
 const SCROLL_THRESHOLD = 0.05
 // Scales displacement (after deadzone) to nut-js scroll units per frame.
-// Higher = faster scroll the further the hand moves.
 const SCROLL_MULTIPLIER = 50
 // Degrees of 3D rotation per normalized unit of hand movement (internal cube).
 const ROT_SCALE = 200
+// Left-hand active zone — matches right-hand mapping so drag feels 1:1 with screen.
+const ACTIVE_MIN = 0.15
+const ACTIVE_RANGE = 0.70
+
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v
+}
+
+/** Convert a normalized MediaPipe wrist coord to absolute screen pixels. */
+function wristToScreen(wrist: Landmark): { x: number; y: number } {
+  const W = window.screen.width
+  const H = window.screen.height
+  const sx = clamp((1 - wrist.x - ACTIVE_MIN) / ACTIVE_RANGE, 0, 1) * W
+  const sy = clamp((wrist.y - ACTIVE_MIN) / ACTIVE_RANGE, 0, 1) * H
+  return { x: Math.round(sx), y: Math.round(sy) }
+}
 
 export function useLeftHandControl(): {
   processLeftFrame: (landmarks: Landmark[] | null, gesture: GestureName) => void
 } {
   // --- scroll loop state ---
   const scrollDirRef = useRef<'up' | 'down' | null>(null)
-  const scrollSpeedRef = useRef(0)               // proportional speed updated each camera frame
+  const scrollSpeedRef = useRef(0)
   const rafRef = useRef<number | null>(null)
   const scrollAnchorY = useRef<number | null>(null)
 
-  // --- grab/drag state ---
-  const grabActiveRef = useRef(false)            // true = mouseDown already sent to OS
+  // --- MMB grab/drag state ---
+  const grabActiveRef = useRef(false)   // true = middleDown already sent
   const prevPosRef = useRef<{ x: number; y: number } | null>(null)
 
   const setScrolling = useLeftHandStore((s) => s.setScrolling)
@@ -40,7 +55,7 @@ export function useLeftHandControl(): {
   }, [setScrolling])
 
   const startScrollLoop = useCallback((): void => {
-    if (rafRef.current !== null) return // already running
+    if (rafRef.current !== null) return
     const loop = (): void => {
       const dir = scrollDirRef.current
       const speed = scrollSpeedRef.current
@@ -52,26 +67,26 @@ export function useLeftHandControl(): {
     rafRef.current = requestAnimationFrame(loop)
   }, [])
 
-  // Cancel scroll loop and release any held OS drag on unmount.
-  useEffect(() => () => {
-    stopScrollLoop()
+  const releaseGrab = useCallback((): void => {
     if (grabActiveRef.current) {
-      window.electron.cursor.mouseUp()
+      window.electron.cursor.middleUp()
       grabActiveRef.current = false
     }
-  }, [stopScrollLoop])
+    prevPosRef.current = null
+  }, [])
+
+  // Cleanup on unmount.
+  useEffect(() => () => {
+    stopScrollLoop()
+    releaseGrab()
+  }, [stopScrollLoop, releaseGrab])
 
   // ----- per-frame processor (called from CameraView) -----
   const processLeftFrame = useCallback(
     (landmarks: Landmark[] | null, gesture: GestureName): void => {
       if (!landmarks) {
         stopScrollLoop()
-        // Release OS drag if hand disappears mid-grab.
-        if (grabActiveRef.current) {
-          window.electron.cursor.mouseUp()
-          grabActiveRef.current = false
-        }
-        prevPosRef.current = null
+        releaseGrab()
         setGrabbing(false)
         setRotationDelta(0, 0)
         return
@@ -82,11 +97,7 @@ export function useLeftHandControl(): {
 
       if (gesture === 'v-shape') {
         // ----- proportional anchor-and-drag auto-scroll -----
-        // Release any grab held from a previous gesture.
-        if (grabActiveRef.current) {
-          window.electron.cursor.mouseUp()
-          grabActiveRef.current = false
-        }
+        releaseGrab()
 
         if (scrollAnchorY.current === null) {
           scrollAnchorY.current = wrist.y
@@ -101,31 +112,30 @@ export function useLeftHandControl(): {
           scrollDirRef.current = 'down'
           scrollSpeedRef.current = Math.max(1, Math.round(absDelta * SCROLL_MULTIPLIER))
         } else {
-          scrollDirRef.current = null   // deadzone — pause
+          scrollDirRef.current = null
           scrollSpeedRef.current = 0
         }
         setScrolling(true, scrollDirRef.current)
         startScrollLoop()
-        prevPosRef.current = null
         setGrabbing(false)
         setRotationDelta(0, 0)
 
       } else if (isGrab) {
-        // ----- universal OS-level drag (Strategy B) -----
-        // Stop any running scroll loop first.
+        // ----- universal MMB drag — works in Blender, Three.js, any OS app -----
         stopScrollLoop()
         setGrabbing(true)
 
-        // Press and hold the left mouse button at the first grab frame so the
-        // right hand's cursor movements naturally drag whatever is under it —
-        // any 3D canvas, slider, or scrollable element in any app.
         if (!grabActiveRef.current) {
           grabActiveRef.current = true
-          window.electron.cursor.mouseDown()
+          window.electron.cursor.middleDown()
         }
 
-        // Also publish deltas to leftHandStore so the internal dashboard
-        // ModelViewer keeps working as a bonus visual.
+        // Drive the cursor with the left wrist while MMB is held.
+        // This makes the left hand a true joystick for 3D camera orbit.
+        const screen = wristToScreen(wrist)
+        window.electron.cursor.move(screen.x, screen.y)
+
+        // Also publish deltas for the internal ModelViewer cube.
         const prev = prevPosRef.current
         prevPosRef.current = { x: wrist.x, y: wrist.y }
         if (prev) {
@@ -138,18 +148,13 @@ export function useLeftHandControl(): {
         }
 
       } else {
-        // Any other gesture — idle. Release OS drag if held.
         stopScrollLoop()
-        if (grabActiveRef.current) {
-          window.electron.cursor.mouseUp()
-          grabActiveRef.current = false
-        }
-        prevPosRef.current = null
+        releaseGrab()
         setGrabbing(false)
         setRotationDelta(0, 0)
       }
     },
-    [stopScrollLoop, startScrollLoop, setScrolling, setGrabbing, setRotationDelta],
+    [stopScrollLoop, startScrollLoop, releaseGrab, setScrolling, setGrabbing, setRotationDelta],
   )
 
   return { processLeftFrame }
