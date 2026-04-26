@@ -296,10 +296,6 @@ export async function resolveAndLaunch(
     if (_payload.action === 'select_link') {
       const _linkIndex = _payload.linkIndex
       const _linkText = (_payload.linkText ?? '').trim()
-      // #region agent log
-      writeAgentDebugLog('initial','H3,H4','src/main/voiceCommands.ts:select_link','Main select_link requested',{linkIndex:_linkIndex,hasLinkText:_linkText.length>0,linkTextLength:_linkText.length,confidence:_payload.confidence})
-      fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b555ed'},body:JSON.stringify({sessionId:'b555ed',runId:'initial',hypothesisId:'H3,H4',location:'src/main/voiceCommands.ts:select_link',message:'Main select_link requested',data:{linkIndex:_linkIndex,hasLinkText:_linkText.length>0,linkTextLength:_linkText.length,confidence:_payload.confidence},timestamp:Date.now()})}).catch(()=>{})
-      // #endregion
       if (_linkIndex === undefined && _linkText.length === 0) {
         return { ok: false, message: 'select_link requires linkIndex or linkText' }
       }
@@ -307,10 +303,6 @@ export async function resolveAndLaunch(
         _linkIndex,
         _linkText.length > 0 ? _linkText : undefined
       )
-      // #region agent log
-      writeAgentDebugLog('initial','H3,H4','src/main/voiceCommands.ts:select_link','Main select_link resolved',{selectedIndex:link.index,selectedTextLength:link.text.length,selectedHrefHost:(()=>{try{return new URL(link.href).host}catch{return 'unknown'}})(),pageTitle})
-      fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b555ed'},body:JSON.stringify({sessionId:'b555ed',runId:'initial',hypothesisId:'H3,H4',location:'src/main/voiceCommands.ts:select_link',message:'Main select_link resolved',data:{selectedIndex:link.index,selectedTextLength:link.text.length,selectedHrefHost:(()=>{try{return new URL(link.href).host}catch{return 'unknown'}})(),pageTitle},timestamp:Date.now()})}).catch(()=>{})
-      // #endregion
       return {
         ok: true,
         message: `Opened link ${link.index} on "${pageTitle}": ${link.text}`
