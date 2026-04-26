@@ -189,6 +189,7 @@ export default function CameraView(): React.JSX.Element {
         <div className="absolute top-2 right-2 bg-black/60 text-green-400 text-xs font-mono px-2 py-1 rounded">
           {fps} FPS
         </div>
+
       </div>
     </div>
   )

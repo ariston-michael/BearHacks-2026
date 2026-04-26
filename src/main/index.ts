@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'node:path'
 import { mouse, keyboard, Key, Button } from '@nut-tree-fork/nut-js'
 import icon from '../../resources/icon.png?asset'
@@ -193,6 +193,16 @@ app.whenReady().then(() => {
       }
     } catch (error) {
       console.error('[ipc cursor:scroll] failed', error)
+    }
+  })
+
+  ipcMain.handle('display:getActiveMetrics', () => {
+    const point = screen.getCursorScreenPoint()
+    const activeDisplay = screen.getDisplayNearestPoint(point)
+    return {
+      width: activeDisplay.size.width,
+      height: activeDisplay.size.height,
+      scaleFactor: activeDisplay.scaleFactor
     }
   })
 

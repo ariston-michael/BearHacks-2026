@@ -66,6 +66,9 @@ export function classifyGesture(
   // Thumbs-up: all four fingers curled, thumb clearly pointing up.
   if (!index && !middle && !ring && !pinky && isThumbUp(lm)) return 'thumbs-up'
 
+  // Devil-horns: index + pinky extended, middle + ring folded.
+  if (index && !middle && !ring && pinky) return 'devil-horns'
+
   // Point: only index extended.
   if (index && !middle && !ring && !pinky) return 'point'
 

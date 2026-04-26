@@ -23,6 +23,10 @@ interface SettingsAPI {
   setApiKey: (service: string, key: string) => Promise<void>
 }
 
+interface DisplayAPI {
+  getActiveMetrics: () => Promise<{ width: number; height: number; scaleFactor: number }>
+}
+
 interface VoiceApi {
   executeIntent: (_payload: VoiceExecuteIntentPayload) => Promise<VoiceExecuteIntentResult>
 }
@@ -35,6 +39,7 @@ type AppElectronAPI = ElectronAPI & {
   cursor: CursorAPI
   keyboard: KeyboardAPI
   settings: SettingsAPI
+  display: DisplayAPI
 }
 
 declare global {

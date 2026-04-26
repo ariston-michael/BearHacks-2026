@@ -3,6 +3,7 @@
 
 export type GestureName =
   | 'pinch'
+  | 'devil-horns'
   | 'fist'
   | 'open-palm'
   | 'point'
