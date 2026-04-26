@@ -5,7 +5,7 @@ import ModelViewer from '../components/ModelViewer'
 export default function DashboardPage(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col gap-4">
-      <div className="min-h-[min(50vh,480px)] shrink-0 overflow-hidden rounded-xl border border-white/10">
+      <div className="min-h-[min(50vh,480px)] shrink-0 overflow-hidden rounded-xl border border-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05),0_4px_24px_rgba(0,0,0,0.25)]">
         <CameraView />
       </div>
       <div className="flex flex-col xl:flex-row gap-4 shrink-0">

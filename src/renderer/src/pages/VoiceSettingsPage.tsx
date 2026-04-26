@@ -134,7 +134,7 @@ export default function VoiceSettingsPage(): React.JSX.Element {
 
       <div className="flex flex-col gap-5">
         {/* Acknowledgements toggle */}
-        <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+        <div className="flex items-center justify-between rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)] px-4 py-3">
           <div>
             <div className="text-sm font-medium text-white">Voice Acknowledgements</div>
             <div className="mt-0.5 text-xs text-white/50">
@@ -158,7 +158,7 @@ export default function VoiceSettingsPage(): React.JSX.Element {
         </div>
 
         {/* Voice picker */}
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)] p-4">
           <h2 className="mb-3 text-sm font-semibold text-white">Voice</h2>
           {m_voicesLoading && (
             <p className="text-xs text-white/50">Loading voices from ElevenLabs...</p>
@@ -197,7 +197,7 @@ export default function VoiceSettingsPage(): React.JSX.Element {
         </div>
 
         {/* Model picker */}
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)] p-4">
           <h2 className="mb-3 text-sm font-semibold text-white">Model</h2>
           <select
             value={_modelId}
@@ -213,7 +213,7 @@ export default function VoiceSettingsPage(): React.JSX.Element {
         </div>
 
         {/* Voice parameters */}
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)] p-4">
           <h2 className="mb-4 text-sm font-semibold text-white">Voice Parameters</h2>
           <div className="flex flex-col gap-4">
             <SliderRow
@@ -273,7 +273,7 @@ export default function VoiceSettingsPage(): React.JSX.Element {
         </div>
 
         {/* Test voice */}
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)] p-4">
           <h2 className="mb-3 text-sm font-semibold text-white">Test Voice</h2>
           <p className="mb-3 text-xs text-white/50">
             Plays <span className="italic">&ldquo;Hello, I&apos;m ready to help you.&rdquo;</span> with the current settings.

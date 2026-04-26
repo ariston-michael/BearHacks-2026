@@ -83,7 +83,7 @@ export default function TutorialPage(): React.JSX.Element {
         {CARDS.map((card) => (
           <div
             key={card.pose}
-            className="flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/5 shadow-lg transition-shadow hover:shadow-xl hover:shadow-black/40"
+            className="flex flex-col overflow-hidden rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)] transition-shadow hover:shadow-xl hover:border-white/20"
           >
             {/* 3D hand preview */}
             <TutorialHandViewer pose={card.pose} color={card.color} />

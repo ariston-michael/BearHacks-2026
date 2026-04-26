@@ -288,7 +288,7 @@ export default function VoiceControlPanel(): React.JSX.Element {
     _audioLevel > 0.06 ? 'bg-green-400' : _audioLevel > 0.025 ? 'bg-yellow-300' : 'bg-white/30'
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+    <section className="rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)]">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-white">AirFlow Audio</h2>
