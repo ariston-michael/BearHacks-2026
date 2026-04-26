@@ -16,9 +16,7 @@ const electronAPI = {
     move: (x: number, y: number) => ipcRenderer.invoke('cursor:move', x, y),
     click: () => ipcRenderer.invoke('cursor:click'),
     rightClick: () => ipcRenderer.invoke('cursor:rightClick'),
-    scroll: (deltaY: number) => ipcRenderer.invoke('cursor:scroll', deltaY),
-    mouseDown: () => ipcRenderer.invoke('cursor:mouseDown'),
-    mouseUp: () => ipcRenderer.invoke('cursor:mouseUp')
+    scroll: (deltaY: number) => ipcRenderer.invoke('cursor:scroll', deltaY)
   },
   keyboard: {
     shortcut: (keys: string[]) => ipcRenderer.invoke('keyboard:shortcut', keys)

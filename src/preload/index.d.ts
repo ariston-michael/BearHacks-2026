@@ -6,8 +6,6 @@ interface CursorAPI {
   click: () => Promise<void>
   rightClick: () => Promise<void>
   scroll: (deltaY: number) => Promise<void>
-  mouseDown: () => Promise<void>
-  mouseUp: () => Promise<void>
 }
 
 interface KeyboardAPI {
