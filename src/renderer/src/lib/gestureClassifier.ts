@@ -48,6 +48,7 @@ export function classifyGesture(
   landmarks: Landmark[],
   _handedness: 'left' | 'right'
 ): GestureName {
+  void _handedness
   const lm = landmarks
 
   const index  = isFingerExtended(lm, 'index')
