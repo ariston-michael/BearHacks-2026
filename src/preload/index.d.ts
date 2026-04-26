@@ -16,6 +16,13 @@ interface KeyboardAPI {
   shortcut: (keys: string[]) => Promise<void>
 }
 
+interface SettingsAPI {
+  getStartup: () => Promise<boolean>
+  setStartup: (v: boolean) => Promise<void>
+  getApiKey: (service: string) => Promise<string>
+  setApiKey: (service: string, key: string) => Promise<void>
+}
+
 interface VoiceApi {
   executeIntent: (_payload: VoiceExecuteIntentPayload) => Promise<VoiceExecuteIntentResult>
 }
@@ -27,6 +34,7 @@ interface AirControlApi {
 type AppElectronAPI = ElectronAPI & {
   cursor: CursorAPI
   keyboard: KeyboardAPI
+  settings: SettingsAPI
 }
 
 declare global {
