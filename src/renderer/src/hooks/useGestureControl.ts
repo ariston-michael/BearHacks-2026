@@ -7,6 +7,12 @@ const ACTIVE_RANGE = 0.70
 const DEAD_ZONE_PX = 4
 const SMOOTHING = 0.3
 
+// Hysteresis thresholds for pinch (normalized tip-to-tip distance).
+// Tighter to engage, looser to release — prevents jitter at the boundary.
+const PINCH_ON_DIST  = 0.04
+const PINCH_OFF_DIST = 0.06
+const PINCH_COOLDOWN_MS = 200
+
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v
 }
@@ -18,15 +24,19 @@ function deltaScale(distFromCenter: number): number {
   return 0.7 + t * 0.6
 }
 
+function tipDist(lm: Landmark[]): number {
+  return Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y)
+}
+
 export function useGestureControl(): {
   processFrame: (landmarks: Landmark[], gesture: GestureName, leftHandGesture: GestureName) => void
   isPrecisionMode: boolean
 } {
   const smoother = useRef(new Vector2Smoother(SMOOTHING))
   const pinchHeld = useRef(false)
+  const pinchCooldownUntil = useRef(0)
   const lastPos = useRef({ x: -1, y: -1 })
   const [isPrecisionMode, setIsPrecisionMode] = useState(false)
-  // Ref prevents calling setIsPrecisionMode every frame when value hasn't changed.
   const precisionRef = useRef(false)
 
   const processFrame = useCallback(
@@ -53,7 +63,6 @@ export function useGestureControl(): {
         const distFromCenter = Math.hypot(activeX - 0.5, activeY - 0.5)
         const accel = deltaScale(distFromCenter)
 
-        // Apply both acceleration and precision multiplier to the per-frame delta.
         let scaledX: number
         let scaledY: number
         if (lastPos.current.x < 0) {
@@ -75,26 +84,31 @@ export function useGestureControl(): {
         window.electron.cursor.move(Math.round(smoothed.x), Math.round(smoothed.y))
       }
 
-      const releasePinch = (): void => {
-        if (pinchHeld.current) {
-          pinchHeld.current = false
-          window.electron.cursor.mouseUp()
-        }
+      // --- hysteresis pinch detection on raw landmark distance ---
+      const rawDist = tipDist(landmarks)
+      const now = Date.now()
+
+      if (!pinchHeld.current && rawDist < PINCH_ON_DIST && now >= pinchCooldownUntil.current) {
+        pinchHeld.current = true
+        window.electron.cursor.mouseDown()
+      } else if (pinchHeld.current && rawDist > PINCH_OFF_DIST) {
+        pinchHeld.current = false
+        pinchCooldownUntil.current = now + PINCH_COOLDOWN_MS
+        window.electron.cursor.mouseUp()
       }
 
+      // Cursor moves for pointing/palm gestures, and while pinch is held.
       if (gesture === 'open-palm' || gesture === 'point') {
-        releasePinch()
         moveCursor(landmarks[8])
-      } else if (gesture === 'pinch') {
-        if (!pinchHeld.current) {
-          pinchHeld.current = true
-          window.electron.cursor.mouseDown()
-        }
+      } else if (pinchHeld.current) {
         moveCursor(landmarks[8])
       } else if (gesture === 'fist') {
-        releasePinch()
-      } else {
-        releasePinch()
+        // fist = intentional stop; release any stuck pinch as safety.
+        if (pinchHeld.current) {
+          pinchHeld.current = false
+          pinchCooldownUntil.current = now + PINCH_COOLDOWN_MS
+          window.electron.cursor.mouseUp()
+        }
       }
     },
     [] // setIsPrecisionMode is stable; no other captured deps

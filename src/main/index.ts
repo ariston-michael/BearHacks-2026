@@ -144,6 +144,22 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('cursor:middleDown', async () => {
+    try {
+      await mouse.pressButton(Button.MIDDLE)
+    } catch (err) {
+      console.error('[ipc cursor:middleDown] failed', err)
+    }
+  })
+
+  ipcMain.handle('cursor:middleUp', async () => {
+    try {
+      await mouse.releaseButton(Button.MIDDLE)
+    } catch (err) {
+      console.error('[ipc cursor:middleUp] failed', err)
+    }
+  })
+
   ipcMain.handle('cursor:rightClick', async () => {
     try {
       await mouse.rightClick()

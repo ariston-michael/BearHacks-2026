@@ -8,6 +8,8 @@ interface CursorAPI {
   scroll: (deltaY: number) => Promise<void>
   mouseDown: () => Promise<void>
   mouseUp: () => Promise<void>
+  middleDown: () => Promise<void>
+  middleUp: () => Promise<void>
 }
 
 interface KeyboardAPI {
