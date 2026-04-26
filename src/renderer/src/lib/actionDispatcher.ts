@@ -6,7 +6,9 @@ export type GestureAction =
 	| 'scroll'
 	| 'cursor-move'
 
-export function dispatchAction(action: GestureAction, params?: any): void {
+type GestureActionParams = number | { deltaY?: unknown; x?: unknown; y?: unknown }
+
+export function dispatchAction(action: GestureAction, params?: GestureActionParams): void {
 	switch (action) {
 		case 'click':
 			void window.electron.cursor.click()
@@ -27,8 +29,9 @@ export function dispatchAction(action: GestureAction, params?: any): void {
 			break
 		}
 		case 'cursor-move': {
-			const x = typeof params?.x === 'number' ? params.x : 0
-			const y = typeof params?.y === 'number' ? params.y : 0
+			const moveParams = typeof params === 'object' && params !== null ? params : {}
+			const x = typeof moveParams.x === 'number' ? moveParams.x : 0
+			const y = typeof moveParams.y === 'number' ? moveParams.y : 0
 			void window.electron.cursor.move(x, y)
 			break
 		}

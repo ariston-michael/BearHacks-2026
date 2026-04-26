@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ElevenLabsScribeTranscriber } from '../lib/elevenLabsTranscriber'
 import { ElevenLabsTtsService } from '../lib/elevenLabsTts'
+import { WakeWordDetector } from '../lib/wakeWord'
 import type { SpeechTranscriber } from '../lib/speechRecognition'
 import { dispatchVoiceIntent } from '../lib/voiceActionDispatcher'
 import { VultrGemmaIntentProvider, type VoiceIntentProvider } from '../lib/voiceIntent'
@@ -61,6 +62,8 @@ function SpeakerIcon({ _muted }: { _muted: boolean }): React.JSX.Element {
 
 export default function VoiceControlPanel(): React.JSX.Element {
   const _transcriberRef = useRef<SpeechTranscriber | null>(null)
+  const _wakeWordRef = useRef<WakeWordDetector | null>(null)
+  const [_isWakeWordMode, _setIsWakeWordMode] = useState(false)
 
   const _isListening = useVoiceStore((_state) => _state.isListening)
   const _isRecording = useVoiceStore((_state) => _state.isRecording)
@@ -73,6 +76,8 @@ export default function VoiceControlPanel(): React.JSX.Element {
   const _setIsListening = useVoiceStore((_state) => _state.setIsListening)
   const _setIsRecording = useVoiceStore((_state) => _state.setIsRecording)
   const _setAudioLevel = useVoiceStore((_state) => _state.setAudioLevel)
+  const _setTranscript = useVoiceStore((_state) => _state.setTranscript)
+  const _setLastSegments = useVoiceStore((_state) => _state.setLastSegments)
   const _setLastIntent = useVoiceStore((_state) => _state.setLastIntent)
   const _setLastActionResult = useVoiceStore((_state) => _state.setLastActionResult)
   const _setErrorMessage = useVoiceStore((_state) => _state.setErrorMessage)
@@ -92,13 +97,24 @@ export default function VoiceControlPanel(): React.JSX.Element {
   const _hasElevenLabsKey = ELEVENLABS_API_KEY.length > 0
   const _hasVultrKey = VULTR_API_KEY.length > 0
 
-  useEffect(() => {
-    return () => {
-      _transcriberRef.current?.stop()
-      _transcriberRef.current = null
-      m_tts.cancel()
+  const startWakeWord = (): void => {
+    if (_wakeWordRef.current) {
+      return
     }
-  }, [])
+    const _detector = new WakeWordDetector({
+      onWakeWord: () => {
+        _wakeWordRef.current = null
+        _setIsWakeWordMode(false)
+        void _startListening()
+      },
+      onError: (_message) => {
+        _setErrorMessage(_message)
+      }
+    })
+    _wakeWordRef.current = _detector
+    _setIsWakeWordMode(true)
+    _detector.start()
+  }
 
   const _speakAck = (_intent: VoiceIntent): void => {
     if (!_acknowledgementsEnabled || !_hasElevenLabsKey) {
@@ -138,9 +154,11 @@ export default function VoiceControlPanel(): React.JSX.Element {
     }
 
     _setErrorMessage(null)
+    _setTranscript('')
+    _setLastSegments([])
     try {
       const _transcriber = new ElevenLabsScribeTranscriber(
-        { apiKey: ELEVENLABS_API_KEY, diarize: true, languageCode: 'en', isolateAudio: true },
+        { apiKey: ELEVENLABS_API_KEY, diarize: true, languageCode: 'en', isolateAudio: true, inactivityTimeoutMs: 3000 },
         {
           onStart: () => _setIsListening(true),
           onEnd: () => {
@@ -151,7 +169,14 @@ export default function VoiceControlPanel(): React.JSX.Element {
           onAudioLevel: (_rms) => _setAudioLevel(_rms),
           onRecordingStart: () => _setIsRecording(true),
           onRecordingEnd: () => _setIsRecording(false),
+          onInactivityTimeout: () => {
+            _stopListening()
+            startWakeWord()
+          },
           onTranscript: async (_result) => {
+            // #region agent log
+            fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b555ed'},body:JSON.stringify({sessionId:'b555ed',runId:'initial',hypothesisId:'H2',location:'src/renderer/src/components/VoiceControlPanel.tsx:onTranscript',message:'Transcript callback started',data:{textLength:_result.text.length,textPrefix:_result.text.slice(0,120),segmentCount:_result.segments.length,segmentWindows:_result.segments.map((_s)=>({speakerId:_s.speakerId,startSec:_s.startSec,endSec:_s.endSec,textLength:_s.text.length}))},timestamp:Date.now()})}).catch(()=>{})
+            // #endregion
             _appendTranscript(_result.text, _result.segments)
             _setErrorMessage(null)
             if (!m_intentProvider) {
@@ -167,6 +192,9 @@ export default function VoiceControlPanel(): React.JSX.Element {
               _setLastIntent(_intent)
               const _actionResult = await dispatchVoiceIntent(_intent)
               _setLastActionResult(_actionResult)
+              // #region agent log
+              fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b555ed'},body:JSON.stringify({sessionId:'b555ed',runId:'initial',hypothesisId:'H1,H2,H3,H4',location:'src/renderer/src/components/VoiceControlPanel.tsx:onTranscript',message:'Intent dispatch completed',data:{intentAction:_intent.action,confidence:_intent.confidence,linkIndex:_intent.linkIndex,hasLinkText:Boolean(_intent.linkText?.trim()),actionOk:_actionResult.ok,actionMessage:_actionResult.message},timestamp:Date.now()})}).catch(()=>{})
+              // #endregion
               if (_actionResult.ok) {
                 _speakAck(_intent)
               }
@@ -199,9 +227,34 @@ export default function VoiceControlPanel(): React.JSX.Element {
     _setAudioLevel(0)
   }
 
+  const _onStop = (): void => {
+    _wakeWordRef.current?.stop()
+    _wakeWordRef.current = null
+    _stopListening()
+    _setIsWakeWordMode(false)
+  }
+
+  const _onStartListening = (): void => {
+    _wakeWordRef.current?.stop()
+    _wakeWordRef.current = null
+    _setIsWakeWordMode(false)
+    void _startListening()
+  }
+
   const _onReset = (): void => {
     _clearVoiceState()
   }
+
+  useEffect(() => {
+    startWakeWord()
+    return () => {
+      _wakeWordRef.current?.stop()
+      _wakeWordRef.current = null
+      _transcriberRef.current?.stop()
+      _transcriberRef.current = null
+      m_tts.cancel()
+    }
+  }, [])
 
   const _meterPercent = Math.min(100, Math.max(0, _audioLevel * 600))
   const _meterColor =
@@ -220,6 +273,11 @@ export default function VoiceControlPanel(): React.JSX.Element {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {_isWakeWordMode && (
+            <span className="rounded-full bg-blue-500/20 px-3 py-1 text-xs font-semibold text-blue-300">
+              Waiting for &ldquo;Hey AirControl&rdquo;
+            </span>
+          )}
           {_isRecording && (
             <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-300">
               Recording...
@@ -260,15 +318,15 @@ export default function VoiceControlPanel(): React.JSX.Element {
       <div className="mt-4 flex gap-2">
         <button
           className="rounded bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={_startListening}
+          onClick={_onStartListening}
           disabled={!_hasElevenLabsKey || _isListening}
         >
           {_isListening ? 'Listening...' : 'Start listening'}
         </button>
         <button
           className="rounded bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={_stopListening}
-          disabled={!_isListening}
+          onClick={_onStop}
+          disabled={!_isListening && !_isWakeWordMode}
         >
           Stop
         </button>

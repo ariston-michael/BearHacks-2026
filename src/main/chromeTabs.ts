@@ -109,7 +109,18 @@ function jsString(_value: string): string {
 }
 
 async function getInspectableTabs(): Promise<ChromeTabDescriptor[]> {
-  const _response = await fetch(`http://127.0.0.1:${CHROME_DEBUG_PORT}/json/list`)
+  // #region agent log
+  writeAgentDebugLog('followup','H7','src/main/chromeTabs.ts:getInspectableTabs','Chrome DevTools tab fetch starting',{port:CHROME_DEBUG_PORT})
+  // #endregion
+  let _response: Response
+  try {
+    _response = await fetch(`http://127.0.0.1:${CHROME_DEBUG_PORT}/json/list`)
+  } catch (_err) {
+    // #region agent log
+    writeAgentDebugLog('followup','H7','src/main/chromeTabs.ts:getInspectableTabs','Chrome DevTools tab fetch failed',{port:CHROME_DEBUG_PORT,error:_err instanceof Error ? _err.message : String(_err)})
+    // #endregion
+    throw _err
+  }
   // #region agent log
   writeAgentDebugLog('initial','H3','src/main/chromeTabs.ts:getInspectableTabs','Chrome DevTools tab list response',{ok:_response.ok,status:_response.status,port:CHROME_DEBUG_PORT})
   // #endregion
@@ -128,6 +139,10 @@ async function withCurrentPage<T>(_fn: (_client: CdpClient) => Promise<T>): Prom
   const _page =
     _tabs.find((_tab) => _tab.type === 'page' && /^https?:\/\//i.test(_tab.url)) ??
     _tabs.find((_tab) => _tab.type === 'page')
+  // #region agent log
+  writeAgentDebugLog('followup','H8,H9','src/main/chromeTabs.ts:withCurrentPage','Chrome current page candidate selected',{tabCount:_tabs.length,pageCount:_tabs.filter((_tab)=>_tab.type==='page').length,selectedTitle:_page?.title,selectedUrlHost:(()=>{try{return _page?.url?new URL(_page.url).host:null}catch{return 'invalid-url'}})(),selectedType:_page?.type,hasWebSocket:Boolean(_page?.webSocketDebuggerUrl)})
+  fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b555ed'},body:JSON.stringify({sessionId:'b555ed',runId:'initial',hypothesisId:'H3',location:'src/main/chromeTabs.ts:withCurrentPage',message:'Chrome current page selected',data:{tabCount:_tabs.length,pageCount:_tabs.filter((_tab)=>_tab.type==='page').length,selectedTitle:_page?.title,selectedUrlHost:(()=>{try{return _page?.url?new URL(_page.url).host:null}catch{return 'invalid-url'}})(),selectedType:_page?.type,hasWebSocket:Boolean(_page?.webSocketDebuggerUrl)},timestamp:Date.now()})}).catch(()=>{})
+  // #endregion
   if (!_page?.webSocketDebuggerUrl) {
     throw new Error('No inspectable Chrome page tab is available')
   }
@@ -220,6 +235,9 @@ export async function selectVisibleLink(
       anchor.click()
       return true
     })()`)
+    // #region agent log
+    fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b555ed'},body:JSON.stringify({sessionId:'b555ed',runId:'initial',hypothesisId:'H3,H4',location:'src/main/chromeTabs.ts:selectVisibleLink',message:'Chrome link click evaluated',data:{clicked:_clicked,selectedIndex:_link.index,selectedTextLength:_link.text.length,selectedHrefHost:(()=>{try{return new URL(_link.href).host}catch{return 'invalid-url'}})(),pageTitle:_snapshot.title,pageUrlHost:(()=>{try{return new URL(_snapshot.url).host}catch{return 'invalid-url'}})(),linkCount:_snapshot.links.length},timestamp:Date.now()})}).catch(()=>{})
+    // #endregion
     if (!_clicked) {
       throw new Error(`Could not click visible link "${_link.text}"`)
     }

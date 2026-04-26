@@ -276,7 +276,7 @@ export default function VoiceSettingsPage(): React.JSX.Element {
         <div className="rounded-xl border border-white/10 bg-white/5 p-4">
           <h2 className="mb-3 text-sm font-semibold text-white">Test Voice</h2>
           <p className="mb-3 text-xs text-white/50">
-            Plays <span className="italic">"Hello, I'm ready to help you."</span> with the current settings.
+            Plays <span className="italic">&ldquo;Hello, I&apos;m ready to help you.&rdquo;</span> with the current settings.
           </p>
           <div className="flex gap-2">
             <button

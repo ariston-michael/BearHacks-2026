@@ -13,7 +13,7 @@ export default function CameraView(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const handsRef = useRef<Hands | null>(null)
   const cameraRef = useRef<Camera | null>(null)
-  const fpsRef = useRef({ frames: 0, lastTick: Date.now() })
+  const fpsRef = useRef({ frames: 0, lastTick: 0 })
   const leftStabilizerRef = useRef(new GestureStabilizer(3))
   const rightStabilizerRef = useRef(new GestureStabilizer(3))
   const { processFrame, isPrecisionMode } = useGestureControl()
@@ -86,6 +86,9 @@ export default function CameraView(): React.JSX.Element {
       // FPS
       fpsRef.current.frames++
       const now = Date.now()
+      if (fpsRef.current.lastTick === 0) {
+        fpsRef.current.lastTick = now
+      }
       if (now - fpsRef.current.lastTick >= 1000) {
         setFps(fpsRef.current.frames)
         fpsRef.current.frames = 0
@@ -123,7 +126,7 @@ export default function CameraView(): React.JSX.Element {
       })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      setError(`MediaPipe initialization error: ${msg}`)
+      queueMicrotask(() => setError(`MediaPipe initialization error: ${msg}`))
       return
     }
 

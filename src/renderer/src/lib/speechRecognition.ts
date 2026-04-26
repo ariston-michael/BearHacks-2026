@@ -26,6 +26,8 @@ export interface SpeechTranscriberCallbacks {
   onRecordingEnd?: () => void
   onTranscript: (_result: TranscriptResult) => void
   onError?: (_message: string) => void
+  /** Fired when no speech activity occurs for the configured inactivity timeout. */
+  onInactivityTimeout?: () => void
 }
 
 export interface SpeechTranscriber {

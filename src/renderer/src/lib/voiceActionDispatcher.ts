@@ -32,7 +32,11 @@ async function invokeMain(_payload: VoiceExecuteIntentPayload): Promise<VoiceExe
   if (!_api?.executeIntent) {
     return { ok: false, message: 'window.api.voice.executeIntent is not available' }
   }
-  return _api.executeIntent(_payload)
+  const _result = await _api.executeIntent(_payload)
+  // #region agent log
+  fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b555ed'},body:JSON.stringify({sessionId:'b555ed',runId:'initial',hypothesisId:'H3,H4',location:'src/renderer/src/lib/voiceActionDispatcher.ts:invokeMain',message:'Main IPC returned',data:{action:_payload.action,confidence:_payload.confidence,linkIndex:_payload.linkIndex,hasLinkText:Boolean(_payload.linkText?.trim()),ok:_result.ok,message:_result.message},timestamp:Date.now()})}).catch(()=>{})
+  // #endregion
+  return _result
 }
 
 /**

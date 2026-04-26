@@ -18,6 +18,13 @@ export interface UtteranceCaptureCallbacks {
   onSpeechEnd?: (_audio: Blob) => void
   onAudioLevel?: (_rms: number) => void
   onError?: (_message: string) => void
+  /** Fired when no speech starts for `inactivityTimeoutMs` after the session begins or the last utterance ends. */
+  onInactivityTimeout?: () => void
+}
+
+export interface UtteranceCaptureOptions {
+  /** How long to wait (ms) with no voice activity before firing onInactivityTimeout. Default: 3000. */
+  inactivityTimeoutMs?: number
 }
 
 export interface UtteranceCapture {
@@ -46,7 +53,10 @@ function computeRms(_buffer: Float32Array): number {
   return Math.sqrt(_sumSquares / _buffer.length)
 }
 
-export function createUtteranceCapture(_callbacks: UtteranceCaptureCallbacks): UtteranceCapture {
+export function createUtteranceCapture(
+  _callbacks: UtteranceCaptureCallbacks,
+  _options?: UtteranceCaptureOptions
+): UtteranceCapture {
   let m_mediaStream: MediaStream | null = null
   let m_audioContext: AudioContext | null = null
   let m_analyser: AnalyserNode | null = null
@@ -54,14 +64,34 @@ export function createUtteranceCapture(_callbacks: UtteranceCaptureCallbacks): U
   let m_mediaRecorder: MediaRecorder | null = null
   let m_sampleTimer: ReturnType<typeof setInterval> | null = null
   let m_silenceTimer: ReturnType<typeof setTimeout> | null = null
+  let m_inactivityTimer: ReturnType<typeof setTimeout> | null = null
   let m_vadState: VadState = 'idle'
   let m_consecutiveSpeechTicks = 0
   let m_recordingStartedAt = 0
   let m_recordedChunks: Blob[] = []
   let m_mimeType = ''
 
+  const m_inactivityTimeoutMs = _options?.inactivityTimeoutMs ?? 3000
+
   const reportError = (_message: string): void => {
     _callbacks.onError?.(_message)
+  }
+
+  const startInactivityTimer = (): void => {
+    if (m_inactivityTimer) {
+      clearTimeout(m_inactivityTimer)
+    }
+    m_inactivityTimer = setTimeout(() => {
+      m_inactivityTimer = null
+      _callbacks.onInactivityTimeout?.()
+    }, m_inactivityTimeoutMs)
+  }
+
+  const cancelInactivityTimer = (): void => {
+    if (m_inactivityTimer) {
+      clearTimeout(m_inactivityTimer)
+      m_inactivityTimer = null
+    }
   }
 
   const stopRecorderAndEmit = (): void => {
@@ -87,6 +117,7 @@ export function createUtteranceCapture(_callbacks: UtteranceCaptureCallbacks): U
       reportError(_message)
       m_vadState = 'idle'
     }
+    startInactivityTimer()
   }
 
   const startRecorder = (): void => {
@@ -106,6 +137,7 @@ export function createUtteranceCapture(_callbacks: UtteranceCaptureCallbacks): U
       m_mediaRecorder.start()
       m_recordingStartedAt = Date.now()
       m_vadState = 'speaking'
+      cancelInactivityTimer()
       _callbacks.onSpeechStart?.()
     } catch (_error) {
       const _message = _error instanceof Error ? _error.message : 'media-recorder-start-failed'
@@ -181,6 +213,7 @@ export function createUtteranceCapture(_callbacks: UtteranceCaptureCallbacks): U
       m_sourceNode.connect(m_analyser)
       m_mimeType = pickSupportedMimeType()
       m_sampleTimer = setInterval(tick, SAMPLE_INTERVAL_MS)
+      startInactivityTimer()
     } catch (_error) {
       const _message = _error instanceof Error ? _error.message : 'audio-context-init-failed'
       reportError(_message)
@@ -198,6 +231,7 @@ export function createUtteranceCapture(_callbacks: UtteranceCaptureCallbacks): U
       clearTimeout(m_silenceTimer)
       m_silenceTimer = null
     }
+    cancelInactivityTimer()
     if (m_mediaRecorder && m_mediaRecorder.state !== 'inactive') {
       try {
         m_mediaRecorder.stop()

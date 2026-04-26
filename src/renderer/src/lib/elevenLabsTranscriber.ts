@@ -30,6 +30,12 @@ export interface ElevenLabsTranscriberOptions {
    * Defaults to false.
    */
   isolateAudio?: boolean
+  /**
+   * How long (ms) to wait with no voice activity before firing
+   * onInactivityTimeout. Passed to the underlying audioCapture VAD.
+   * Default: 3000.
+   */
+  inactivityTimeoutMs?: number
 }
 
 interface ScribeWord {
@@ -119,6 +125,7 @@ export class ElevenLabsScribeTranscriber implements SpeechTranscriber {
   private readonly m_languageCode: string | undefined
   private readonly m_diarize: boolean
   private readonly m_isolateAudio: boolean
+  private readonly m_inactivityTimeoutMs: number
   private readonly m_callbacks: SpeechTranscriberCallbacks
   private m_capture: UtteranceCapture | null = null
   private m_inflightRequests = 0
@@ -133,6 +140,7 @@ export class ElevenLabsScribeTranscriber implements SpeechTranscriber {
     this.m_languageCode = _options.languageCode
     this.m_diarize = _options.diarize ?? true
     this.m_isolateAudio = _options.isolateAudio ?? false
+    this.m_inactivityTimeoutMs = _options.inactivityTimeoutMs ?? 3000
     this.m_callbacks = _callbacks
   }
 
@@ -147,8 +155,9 @@ export class ElevenLabsScribeTranscriber implements SpeechTranscriber {
         this.m_callbacks.onRecordingEnd?.()
         void this.transcribeUtterance(_blob)
       },
-      onError: (_message) => this.m_callbacks.onError?.(_message)
-    })
+      onError: (_message) => this.m_callbacks.onError?.(_message),
+      onInactivityTimeout: () => this.m_callbacks.onInactivityTimeout?.()
+    }, { inactivityTimeoutMs: this.m_inactivityTimeoutMs })
     this.m_capture = _capture
     try {
       await _capture.start()
