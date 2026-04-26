@@ -1,6 +1,8 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { GestureName, Landmark } from '../types'
 import { Vector2Smoother } from '../lib/smoothing'
+import { useSettingsStore } from '../stores/settingsStore'
+import type { CalibrationBounds } from '../stores/settingsStore'
 
 const ACTIVE_MIN = 0.15
 const ACTIVE_RANGE = 0.70
@@ -39,6 +41,11 @@ export function useGestureControl(): {
   const [isPrecisionMode, setIsPrecisionMode] = useState(false)
   const precisionRef = useRef(false)
 
+  // Keep calibration bounds in a ref so the stable processFrame callback always reads the latest value.
+  const calibBoundsRef = useRef<CalibrationBounds | null>(null)
+  const calibrationBounds = useSettingsStore((s) => s.calibrationBounds)
+  useEffect(() => { calibBoundsRef.current = calibrationBounds }, [calibrationBounds])
+
   const processFrame = useCallback(
     (landmarks: Landmark[], gesture: GestureName, leftHandGesture: GestureName): void => {
       const W = window.screen.width
@@ -55,8 +62,18 @@ export function useGestureControl(): {
       const speedMultiplier = precision ? 0.4 : 1.0
 
       const moveCursor = (tip: Landmark): void => {
-        const activeX = clamp((1 - tip.x - ACTIVE_MIN) / ACTIVE_RANGE, 0, 1)
-        const activeY = clamp((tip.y - ACTIVE_MIN) / ACTIVE_RANGE, 0, 1)
+        const calib = calibBoundsRef.current
+        let activeX: number
+        let activeY: number
+        if (calib) {
+          // Use calibrated bounds: screenX = 1 - tip.x (mirrored), same as how bounds were captured.
+          const screenX = 1 - tip.x
+          activeX = clamp((screenX - calib.minX) / (calib.maxX - calib.minX), 0, 1)
+          activeY = clamp((tip.y - calib.minY) / (calib.maxY - calib.minY), 0, 1)
+        } else {
+          activeX = clamp((1 - tip.x - ACTIVE_MIN) / ACTIVE_RANGE, 0, 1)
+          activeY = clamp((tip.y - ACTIVE_MIN) / ACTIVE_RANGE, 0, 1)
+        }
         const rawX = activeX * W
         const rawY = activeY * H
 

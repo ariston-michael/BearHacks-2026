@@ -25,6 +25,12 @@ const electronAPI = {
   keyboard: {
     shortcut: (keys: string[]) => ipcRenderer.invoke('keyboard:shortcut', keys)
   },
+  settings: {
+    getStartup: (): Promise<boolean> => ipcRenderer.invoke('settings:getStartup'),
+    setStartup: (v: boolean): Promise<void> => ipcRenderer.invoke('settings:setStartup', v),
+    getApiKey: (service: string): Promise<string> => ipcRenderer.invoke('settings:getApiKey', service),
+    setApiKey: (service: string, key: string): Promise<void> => ipcRenderer.invoke('settings:setApiKey', service, key),
+  },
   process: {
     platform: process.platform,
     versions: process.versions

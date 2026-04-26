@@ -6,6 +6,17 @@ import type { VoiceExecuteIntentPayload, VoiceExecuteIntentResult } from '../sha
 import { resolveAndLaunch } from './voiceCommands'
 import { warmAppCacheWhenReady } from './appDiscovery'
 
+// electron-store v11 is ESM-only; dynamically import so the CJS main bundle can load it.
+type StoreType = import('electron-store').default<Record<string, unknown>>
+let store: StoreType | null = null
+
+async function getStore(): Promise<StoreType> {
+  if (store) return store
+  const { default: Store } = await import('electron-store')
+  store = new Store<Record<string, unknown>>()
+  return store
+}
+
 const ALLOWED: readonly VoiceExecuteIntentPayload['action'][] = [
   'open_app',
   'open_url',
@@ -200,6 +211,26 @@ app.whenReady().then(() => {
     } catch (error) {
       console.error('[ipc keyboard:shortcut] failed', error)
     }
+  })
+
+  // ── Settings: Launch at login ──────────────────────────────────────────────
+  ipcMain.handle('settings:getStartup', () => {
+    return app.getLoginItemSettings().openAtLogin
+  })
+
+  ipcMain.handle('settings:setStartup', (_event, openAtLogin: boolean) => {
+    app.setLoginItemSettings({ openAtLogin })
+  })
+
+  // ── Settings: Secure API key storage (main-process electron-store) ─────────
+  ipcMain.handle('settings:getApiKey', async (_event, service: string) => {
+    const s = await getStore()
+    return s.get(`apiKeys.${service}`, '') as string
+  })
+
+  ipcMain.handle('settings:setApiKey', async (_event, service: string, key: string) => {
+    const s = await getStore()
+    s.set(`apiKeys.${service}`, key)
   })
 
   createWindow()
