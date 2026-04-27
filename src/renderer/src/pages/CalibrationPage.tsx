@@ -163,7 +163,7 @@ export default function CalibrationPage(): React.JSX.Element {
       )}
 
       {/* Persistent camera feed — always mounted so the Camera ref never detaches */}
-      <div className={`rounded-xl overflow-hidden border border-white/10 bg-zinc-950 w-full aspect-video relative max-w-2xl ${phase === 'done' ? 'hidden' : ''}`}>
+      <div className={`rounded-xl overflow-hidden border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl w-full aspect-video relative max-w-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] ${phase === 'done' ? 'hidden' : ''}`}>
         <video
           ref={videoRef}
           className="w-full h-full object-cover"
@@ -199,7 +199,7 @@ export default function CalibrationPage(): React.JSX.Element {
       {/* Intro */}
       {phase === 'intro' && (
         <div className="flex flex-col gap-5">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6">
+          <div className="rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl p-6 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)]">
             <h2 className="text-base font-semibold text-white mb-3">Before you start</h2>
             <ul className="space-y-2 text-sm text-white/60">
               <li className="flex gap-2"><span className="text-indigo-400">①</span> Sit in your normal position in front of the camera.</li>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ElevenLabsScribeTranscriber } from '../lib/elevenLabsTranscriber'
 import { ElevenLabsTtsService } from '../lib/elevenLabsTts'
 import { WakeWordDetector } from '../lib/wakeWord'
@@ -13,7 +13,7 @@ const ELEVENLABS_API_KEY = import.meta.env.RENDERER_VITE_ELEVENLABS_API_KEY ?? '
 const VULTR_API_KEY = import.meta.env.RENDERER_VITE_VULTR_INFERENCE_KEY ?? ''
 
 const m_intentProvider: VoiceIntentProvider | null = VULTR_API_KEY
-  ? new VultrGemmaIntentProvider(VULTR_API_KEY)
+  ? new VultrGemmaIntentProvider(VULTR_API_KEY, 2)
   : null
 
 function buildAckPhrase(_intent: VoiceIntent): string {
@@ -62,7 +62,9 @@ export default function VoiceControlPanel(): React.JSX.Element {
   const _transcriberRef = useRef<SpeechTranscriber | null>(null)
   const _wakeWordRef = useRef<WakeWordDetector | null>(null)
   const _ttsRef = useRef<ElevenLabsTtsService | null>(null)
-  const [_isWakeWordMode, _setIsWakeWordMode] = useState(false)
+  // Holds the latest _startListening so startWakeWord can call it without a stale closure
+  const _startListeningFnRef = useRef<() => Promise<void>>(async () => {})
+  const [_isWakeWordMode, _setIsWakeWordMode] = useState(true)
 
   function getTts(): ElevenLabsTtsService {
     if (!_ttsRef.current) _ttsRef.current = new ElevenLabsTtsService()
@@ -74,7 +76,6 @@ export default function VoiceControlPanel(): React.JSX.Element {
   const _audioLevel = useVoiceStore((_state) => _state.audioLevel)
   const _transcript = useVoiceStore((_state) => _state.transcript)
   const _lastSegments = useVoiceStore((_state) => _state.lastSegments)
-  const _lastIntent = useVoiceStore((_state) => _state.lastIntent)
   const _lastActionResult = useVoiceStore((_state) => _state.lastActionResult)
   const _errorMessage = useVoiceStore((_state) => _state.errorMessage)
   const _setIsListening = useVoiceStore((_state) => _state.setIsListening)
@@ -101,24 +102,41 @@ export default function VoiceControlPanel(): React.JSX.Element {
   const _hasElevenLabsKey = ELEVENLABS_API_KEY.length > 0
   const _hasVultrKey = VULTR_API_KEY.length > 0
 
-  const startWakeWord = (): void => {
+  const startWakeWord = useCallback((): void => {
+    // #region agent log
+    fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9c84b0'},body:JSON.stringify({sessionId:'9c84b0',runId:'initial',hypothesisId:'H1,H2',location:'src/renderer/src/components/VoiceControlPanel.tsx:startWakeWord',message:'startWakeWord invoked',data:{hasWakeDetector:Boolean(_wakeWordRef.current),hasElevenLabsKey:Boolean(ELEVENLABS_API_KEY),isWakeWordMode:_isWakeWordMode,isListening:_isListening},timestamp:Date.now()})}).catch(()=>{})
+    // #endregion
     if (_wakeWordRef.current) {
       return
     }
+    if (!ELEVENLABS_API_KEY) {
+      _setIsWakeWordMode(false)
+      _setErrorMessage(
+        'missing-elevenlabs-api-key: set RENDERER_VITE_ELEVENLABS_API_KEY in .env.local and restart `npm run dev`'
+      )
+      return
+    }
     const _detector = new WakeWordDetector({
+      apiKey: ELEVENLABS_API_KEY,
       onWakeWord: () => {
+        // #region agent log
+        fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9c84b0'},body:JSON.stringify({sessionId:'9c84b0',runId:'initial',hypothesisId:'H3',location:'src/renderer/src/components/VoiceControlPanel.tsx:startWakeWord:onWakeWord',message:'Wake callback reached panel, starting full listener',data:{isWakeWordMode:_isWakeWordMode,isListening:_isListening},timestamp:Date.now()})}).catch(()=>{})
+        // #endregion
         _wakeWordRef.current = null
         _setIsWakeWordMode(false)
-        void _startListening()
+        void _startListeningFnRef.current()
       },
       onError: (_message) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7571/ingest/fa9108c5-730f-4e3a-a373-dbb935263b74',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9c84b0'},body:JSON.stringify({sessionId:'9c84b0',runId:'initial',hypothesisId:'H2',location:'src/renderer/src/components/VoiceControlPanel.tsx:startWakeWord:onError',message:'Wake detector error surfaced in panel',data:{error:_message},timestamp:Date.now()})}).catch(()=>{})
+        // #endregion
         _setErrorMessage(_message)
       }
     })
     _wakeWordRef.current = _detector
     _setIsWakeWordMode(true)
     _detector.start()
-  }
+  }, [_setIsWakeWordMode, _setErrorMessage])
 
   const _speakAck = (_intent: VoiceIntent): void => {
     if (!_acknowledgementsEnabled || !_hasElevenLabsKey) {
@@ -162,7 +180,7 @@ export default function VoiceControlPanel(): React.JSX.Element {
     _setLastSegments([])
     try {
       const _transcriber = new ElevenLabsScribeTranscriber(
-        { apiKey: ELEVENLABS_API_KEY, diarize: true, languageCode: 'en', isolateAudio: true, inactivityTimeoutMs: 3000 },
+        { apiKey: ELEVENLABS_API_KEY, diarize: true, languageCode: 'en', isolateAudio: false, inactivityTimeoutMs: 1500 },
         {
           onStart: () => _setIsListening(true),
           onEnd: () => {
@@ -235,7 +253,8 @@ export default function VoiceControlPanel(): React.JSX.Element {
     _wakeWordRef.current?.stop()
     _wakeWordRef.current = null
     _stopListening()
-    _setIsWakeWordMode(false)
+    // Return to idle: restart wake word detection
+    startWakeWord()
   }
 
   const _onStartListening = (): void => {
@@ -249,6 +268,11 @@ export default function VoiceControlPanel(): React.JSX.Element {
     _clearVoiceState()
   }
 
+  // Keep _startListeningFnRef current so startWakeWord never holds a stale closure
+  useEffect(() => {
+    _startListeningFnRef.current = _startListening
+  })
+
   useEffect(() => {
     return () => {
       _wakeWordRef.current?.stop()
@@ -257,28 +281,29 @@ export default function VoiceControlPanel(): React.JSX.Element {
       _transcriberRef.current = null
       _ttsRef.current?.cancel()
     }
-  }, [])
+  }, [startWakeWord])
 
   const _meterPercent = Math.min(100, Math.max(0, _audioLevel * 600))
   const _meterColor =
     _audioLevel > 0.06 ? 'bg-green-400' : _audioLevel > 0.025 ? 'bg-yellow-300' : 'bg-white/30'
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+    <section className="rounded-xl border border-white/[0.09] bg-white/[0.04] backdrop-blur-xl p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.2)]">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-white">
-            Voice Control (ElevenLabs Scribe + Vultr Gemma 4)
-          </h2>
-          <p className="mt-1 text-sm text-white/60">
-            Energy-VAD + ElevenLabs Scribe for transcription, Vultr Gemma 4 for intent + action
-            (search, open app, scroll). Speak a phrase, pause, and results appear below.
-          </p>
+          <h2 className="text-lg font-semibold text-white">AirFlow Audio</h2>
+          
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {_isWakeWordMode && (
-            <span className="rounded-full bg-blue-500/20 px-3 py-1 text-xs font-semibold text-blue-300">
-              Waiting for &ldquo;Hey AirControl&rdquo;
+            <span className="flex items-center gap-2 rounded-full bg-blue-500/20 px-3 py-1 text-xs font-semibold text-blue-300">
+              <span className="inline-block h-2 w-2 rounded-full bg-blue-400 animate-flicker" />
+              Waiting for &ldquo;Hey AirFlow&rdquo;
+            </span>
+          )}
+          {_isListening && !_isWakeWordMode && (
+            <span className="rounded-full bg-purple-500/20 px-3 py-1 text-xs font-semibold text-purple-300">
+              Priority Voice Active
             </span>
           )}
           {_isRecording && (
@@ -389,17 +414,6 @@ export default function VoiceControlPanel(): React.JSX.Element {
               ))}
             </ul>
           )}
-        </div>
-
-        <div>
-          <div className="mb-1 text-white/50">Intent</div>
-          <div className="font-mono text-xs text-white">
-            {_lastIntent ? (
-              JSON.stringify(_lastIntent)
-            ) : (
-              <span className="text-white/30">(none yet)</span>
-            )}
-          </div>
         </div>
 
         <div>

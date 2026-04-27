@@ -16,7 +16,7 @@ const NAV_ITEMS = [
 function Sidebar(): React.JSX.Element {
   return (
     <aside className="flex h-screen w-48 flex-col gap-1 bg-[#0a0a1a] p-4 border-r border-white/10">
-      <div className="mb-6 text-lg font-bold text-accent tracking-wide">AirControl</div>
+      <div className="mb-6 text-lg font-bold text-accent tracking-wide">AirFlow</div>
       {NAV_ITEMS.map(({ to, label }) => (
         <NavLink
           key={to}

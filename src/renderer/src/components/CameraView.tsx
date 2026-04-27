@@ -17,7 +17,7 @@ export default function CameraView(): React.JSX.Element {
   const fpsRef = useRef({ frames: 0, lastTick: 0 })
   const leftStabilizerRef = useRef(new GestureStabilizer(3))
   const rightStabilizerRef = useRef(new GestureStabilizer(3))
-  const { processFrame, isPrecisionMode } = useGestureControl()
+  const { processFrame, isPrecisionMode, isDragMode } = useGestureControl()
   const { processLeftFrame } = useLeftHandControl()
 
   const [error, setError] = useState<string | null>(null)
@@ -189,6 +189,13 @@ export default function CameraView(): React.JSX.Element {
         <div className="absolute top-2 right-2 bg-black/60 text-green-400 text-xs font-mono px-2 py-1 rounded">
           {fps} FPS
         </div>
+
+        {/* Drag mode badge */}
+        {isDragMode && (
+          <div className="absolute top-10 right-2 bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-semibold animate-pulse">
+            DRAG MODE
+          </div>
+        )}
 
       </div>
     </div>
